@@ -1,0 +1,54 @@
+version=1
+
+[formatters]
+    [formatters.console_formatter]
+    "()"="Utils.logger.ColoredFormatter"
+
+    [formatters.file_formatter]
+    "()"="Utils.logger.FileFormatter"
+
+[handlers]
+    [handlers.console_handler]
+    class="logging.StreamHandler"
+    level="INFO"
+    formatter="console_formatter"
+
+    [handlers.file_handler]
+    class="logging.handlers.TimedRotatingFileHandler"
+    level="DEBUG"
+    when="midnight"
+    formatter="file_formatter"
+    filename="logs/log.log"
+    backupCount=25
+    encoding="utf-8"
+
+[loggers]
+    [loggers.main]
+    handlers=["console_handler", "file_handler"]
+    level="DEBUG"
+    propogate="True"
+    
+    [loggers.FunPayAPI]
+    handlers=["console_handler", "file_handler"]
+    level="DEBUG"
+    propogate="True"
+    
+    [loggers.FPC]
+    handlers=["console_handler", "file_handler"]
+    level="DEBUG"
+    propogate="True"
+    
+    [loggers.TGBot]
+    handlers=["console_handler", "file_handler"]
+    level="DEBUG"
+    propogate="True"
+    
+    [loggers.Telebot]
+    handlers=["console_handler", "file_handler"]
+    level="ERROR"
+    propogate="False"
+    
+    [loggers.plugins]
+    handlers=["console_handler", "file_handler"]
+    level="DEBUG"
+    propogate="True"

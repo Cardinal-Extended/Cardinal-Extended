@@ -1,9 +1,21 @@
-"""
-В данном модуле описаны все кастомные исключения, которые райзятся при валидации конфигов.
-"""
+'В данном модуле описаны все кастомные исключения кардинала.'
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from Utils.types import Plugin
+
+
+from pathlib import Path
+
+
 from locales.localizer import Localizer
 localizer = Localizer()
 _ = localizer.translate
+
+
+__all__ = [
+    'ModuleImportError',
+    'PluginNotTrustedException',
+]
 
 
 class ParamNotFoundError(Exception):
@@ -160,3 +172,31 @@ class FieldNotExistsError(Exception):
 
     def __str__(self):
         return _("exc_plugin_field_not_found", self.plugin_file_name, self.field_name)
+
+
+# ----------------------- Ошибки при загрузке плагинов ----------------------- #
+class ModuleImportError(Exception):
+    def __init__(self, module_path: Path):
+        '''
+        Исключение, поднимающееся при неудачной попытке загрузки модуля.
+
+        :param module_path: Путь к модулю.
+        :type module_path: Path
+        '''
+        self.module_path = module_path
+
+
+    def __str__(self): return f'Ошибка при загрузке модуля {self.module_path.stem} ({self.module_path})'
+
+
+class PluginNotTrustedException(Exception):
+    def __init__(self, plugin: Plugin):
+        '''
+        Исключение, поднимающееся, если плагин отсутствует в доверенных.
+
+        :param plugin: Объект плагина
+        :type plugin: Plugin
+        '''
+        self.plugin = plugin
+
+    def __str__(self): return f'Плагин {self.plugin.name} {self.plugin.uuid} отсутствует в списке доверенных плагинов.'

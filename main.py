@@ -1,5 +1,32 @@
-import time
+
+import sys
+import os
 from pip._internal.cli.main import main
+
+
+from cardinal import Cardinal
+
+
+from configs import logger_config_path
+
+
+import Utils.cardinal_tools
+import Utils.config_loader as cfg_loader
+import Utils.exceptions as excs
+from Utils.logger import LOGGER_CONFIG
+
+
+from first_setup import first_setup
+
+
+from locales.localizer import Localizer
+
+
+import tomllib
+import logging.config
+import colorama
+import time
+
 
 # todo убрать когда-то
 while True:
@@ -16,18 +43,7 @@ while True:
         break
     except ModuleNotFoundError:
         main(["install", "-U", "bcrypt>=4.2.0"])
-import Utils.cardinal_tools
-import Utils.config_loader as cfg_loader
-from first_setup import first_setup
-from colorama import Fore, Style
-from Utils.logger import LOGGER_CONFIG
-import logging.config
-import colorama
-import sys
-import os
-from cardinal import Cardinal
-import Utils.exceptions as excs
-from locales.localizer import Localizer
+
 
 logo = """[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m
 [38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m'[0m[38;5;0m"[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m
@@ -56,19 +72,25 @@ logo = """[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m
 [38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m'[0m[38;5;52m,[0m[38;5;0m'[0m[38;5;0m.[0m[38;5;0m"[0m[38;5;52m,[0m[38;5;0m`[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m [0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m
 [38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m[38;5;0m.[0m"""
 
-VERSION = "0.1.16.9"
 
-Utils.cardinal_tools.set_console_title(f"FunPay Cardinal v{VERSION}")
+VERSION = "0.0.0.1"
+CARDINAL_VERSION = "0.1.16.9"
+
+
+Utils.cardinal_tools.set_console_title(f"Cardinal Extended v{VERSION}")
+
 
 if getattr(sys, 'frozen', False):
     os.chdir(os.path.dirname(sys.executable))
 else:
     os.chdir(os.path.dirname(__file__))
 
+
 folders = ["configs", "logs", "storage", "storage/cache", "storage/plugins", "storage/products", "plugins"]
 for i in folders:
     if not os.path.exists(i):
         os.makedirs(i)
+
 
 files = ["configs/auto_delivery.cfg", "configs/auto_response.cfg"]
 for i in files:
@@ -76,27 +98,32 @@ for i in files:
         with open(i, "w", encoding="utf-8") as f:
             ...
 
+
 colorama.init()
 
-logging.config.dictConfig(LOGGER_CONFIG)
+with open(logger_config_path, 'rb') as fp: logger_config = tomllib.load(fp)
+logging.config.dictConfig(logger_config)
 logging.raiseExceptions = False
 logger = logging.getLogger("main")
 logger.debug("------------------------------------------------------------------")
 
-print(f"{Style.RESET_ALL}{logo}")
-print(f"{Fore.RED}{Style.BRIGHT}v{VERSION}{Style.RESET_ALL}\n")  # locale
-print(f"{Fore.MAGENTA}{Style.BRIGHT}By {Fore.BLUE}{Style.BRIGHT}Woopertail, @sidor0912{Style.RESET_ALL}")
+
+print(f"{colorama.Style.RESET_ALL}{logo}")
+print(f"{colorama.Fore.RED}{colorama.Style.BRIGHT}v{CARDINAL_VERSION}{colorama.Style.RESET_ALL}\n")  # locale
+print(f"{colorama.Fore.MAGENTA}{colorama.Style.BRIGHT}By {colorama.Fore.BLUE}{colorama.Style.BRIGHT}Woopertail, @sidor0912{colorama.Style.RESET_ALL}")
 print(
-    f"{Fore.MAGENTA}{Style.BRIGHT} * GitHub: {Fore.BLUE}{Style.BRIGHT}github.com/sidor0912/FunPayCardinal{Style.RESET_ALL}")
-print(f"{Fore.MAGENTA}{Style.BRIGHT} * Telegram: {Fore.BLUE}{Style.BRIGHT}t.me/sidor0912")
-print(f"{Fore.MAGENTA}{Style.BRIGHT} * Новости о обновлениях: {Fore.BLUE}{Style.BRIGHT}t.me/fpc_updates")
-print(f"{Fore.MAGENTA}{Style.BRIGHT} * Плагины: {Fore.BLUE}{Style.BRIGHT}t.me/fpc_plugins")
-print(f"{Fore.MAGENTA}{Style.BRIGHT} * Донат: {Fore.BLUE}{Style.BRIGHT}t.me/sidor_donate")
-print(f"{Fore.MAGENTA}{Style.BRIGHT} * Telegram-чат: {Fore.BLUE}{Style.BRIGHT}t.me/funpay_cardinal")
+    f"{colorama.Fore.MAGENTA}{colorama.Style.BRIGHT} * GitHub: {colorama.Fore.BLUE}{colorama.Style.BRIGHT}github.com/sidor0912/FunPayCardinal{colorama.Style.RESET_ALL}")
+print(f"{colorama.Fore.MAGENTA}{colorama.Style.BRIGHT} * Telegram: {colorama.Fore.BLUE}{colorama.Style.BRIGHT}t.me/sidor0912")
+print(f"{colorama.Fore.MAGENTA}{colorama.Style.BRIGHT} * Новости о обновлениях: {colorama.Fore.BLUE}{colorama.Style.BRIGHT}t.me/fpc_updates")
+print(f"{colorama.Fore.MAGENTA}{colorama.Style.BRIGHT} * Плагины: {colorama.Fore.BLUE}{colorama.Style.BRIGHT}t.me/fpc_plugins")
+print(f"{colorama.Fore.MAGENTA}{colorama.Style.BRIGHT} * Донат: {colorama.Fore.BLUE}{colorama.Style.BRIGHT}t.me/sidor_donate")
+print(f"{colorama.Fore.MAGENTA}{colorama.Style.BRIGHT} * Telegram-чат: {colorama.Fore.BLUE}{colorama.Style.BRIGHT}t.me/funpay_cardinal")
+
 
 if not os.path.exists("configs/_main.cfg"):
     first_setup()
     sys.exit()
+
 
 if sys.platform == "linux" and os.getenv('FPC_IS_RUNNIG_AS_SERVICE', '0') == '1':
     import getpass
@@ -107,6 +134,7 @@ if sys.platform == "linux" and os.getenv('FPC_IS_RUNNIG_AS_SERVICE', '0') == '1'
     pidFile.close()
 
     logger.info(f"$GREENPID файл создан, PID процесса: {pid}")  # locale
+
 
 directory = 'plugins'
 for filename in os.listdir(directory):
@@ -122,6 +150,7 @@ for filename in os.listdir(directory):
             # Сохраняем изменения обратно в файл
             with open(filepath, 'w', encoding='utf-8') as file:
                 file.write(data)
+
 
 try:
     logger.info("$MAGENTAЗагружаю конфиг _main.cfg...")  # locale
@@ -153,10 +182,9 @@ except:
     time.sleep(5)
     sys.exit()
 
-localizer = Localizer(MAIN_CFG["Other"]["language"])
 
 try:
-    Cardinal(MAIN_CFG, AD_CFG, AR_CFG, RAW_AR_CFG, VERSION).init().run()
+    Cardinal(MAIN_CFG, AD_CFG, AR_CFG, RAW_AR_CFG, CARDINAL_VERSION).init().run()
 except KeyboardInterrupt:
     logger.info("Завершаю программу...")  # locale
     sys.exit()

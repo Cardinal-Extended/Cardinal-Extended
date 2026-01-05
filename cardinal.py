@@ -1,39 +1,63 @@
+
 from __future__ import annotations
-from typing import TYPE_CHECKING, Callable
 
-from FunPayAPI import types
-from FunPayAPI.common.enums import SubCategoryTypes
 
+import sys
+import os
+from pip._internal.cli.main import main
+
+
+import importlib.util
+
+
+from typing import TYPE_CHECKING, Callable, Literal, Any
 if TYPE_CHECKING:
     from configparser import ConfigParser
 
+
+import Utils.exceptions
+from Utils.exceptions import ModuleImportError, PluginNotTrustedException
+from Utils import cardinal_tools
+from Utils.types import Plugin, Handler
+
+
+from configs import Config
+
+
 from tg_bot import auto_response_cp, config_loader_cp, auto_delivery_cp, templates_cp, plugins_cp, file_uploader, \
     authorized_users_cp, proxy_cp, default_cp
+import tg_bot.bot
+
+
+import FunPayAPI
+from FunPayAPI import types
+from FunPayAPI.types import LotShortcut, MyLotShortcut
+from FunPayAPI.common.enums import SubCategoryTypes, EventTypes
+from FunPayAPI import utils as fp_utils
+
+
+import handlers
+import announcements
+
+
+import json
 from types import ModuleType
-import Utils.exceptions
+from pathlib import Path
 from uuid import UUID
-import importlib.util
-import configparser
-import itertools
-import requests
 import datetime
 import logging
 import random
 import time
-import sys
-import os
-from pip._internal.cli.main import main
-import FunPayAPI
-import handlers
-import announcements
+from math import inf
+
+
 from locales.localizer import Localizer
-from FunPayAPI import utils as fp_utils
-from Utils import cardinal_tools
-import tg_bot.bot
+
 
 from threading import Thread
 
-logger = logging.getLogger("FPC")
+
+log = logging.getLogger("FPC")
 localizer = Localizer()
 _ = localizer.translate
 
@@ -80,17 +104,27 @@ class PluginData:
 
 
 class Cardinal(object):
+    instances = {}
+    'Список запущенных экземпляров кардинала.'
+
+
     def __new__(cls, *args, **kwargs):
         if not hasattr(cls, "instance"):
             cls.instance = super(Cardinal, cls).__new__(cls)
         return getattr(cls, "instance")
+
 
     def __init__(self, main_config: ConfigParser,
                  auto_delivery_config: ConfigParser,
                  auto_response_config: ConfigParser,
                  raw_auto_response_config: ConfigParser,
                  version: str):
+        self.name = 'Cardinal'
+        'Имя экземпляра.'
+
         self.VERSION = version
+
+
         self.instance_id = random.randint(0, 999999999)
         self.delivery_tests = {}  # Одноразовые ключи для тестов автовыдачи. {"ключ": "название лота"}
 
@@ -104,7 +138,7 @@ class Cardinal(object):
         self.proxy_dict = cardinal_tools.load_proxy_dict()  # прокси {0: "login:password@ip:port", 1: "ip:port"...}
         if self.MAIN_CFG["Proxy"].getboolean("enable"):
             if self.MAIN_CFG["Proxy"]["ip"] and self.MAIN_CFG["Proxy"]["port"].isnumeric():
-                logger.info(_("crd_proxy_detected"))
+                log.info(_("crd_proxy_detected"))
 
                 ip, port = self.MAIN_CFG["Proxy"]["ip"], self.MAIN_CFG["Proxy"]["port"]
                 login, password = self.MAIN_CFG["Proxy"]["login"], self.MAIN_CFG["Proxy"]["password"]
@@ -199,8 +233,54 @@ class Cardinal(object):
             "BIND_TO_POST_LOTS_RAISE": self.post_lots_raise_handlers,
         }
 
-        self.plugins: dict[str, PluginData] = {}
+
+        self.event_var_names = [
+            'PRE_INIT',
+            'POST_INIT',
+            'PRE_START',
+            'POST_START',
+            'PRE_STOP',
+            'POST_STOP',
+            'INIT_MESSAGE',
+            'MESSAGES_LIST_CHANGED',
+            'LAST_CHAT_MESSAGE_CHANGED',
+            'NEW_MESSAGE',
+            'INIT_ORDER',
+            'NEW_ORDER',
+            'ORDERS_LIST_CHANGED',
+            'ORDER_STATUS_CHANGED',
+            'PROFILE_UPDATE'
+        ]
+        'Имена событий для привязки хендлеров.'
+
+        self.handlers: dict[Literal[
+            'PRE_INIT',
+            'POST_INIT',
+            'PRE_START',
+            'POST_START',
+            'PRE_STOP',
+            'POST_STOP',
+            'INIT_MESSAGE',
+            'MESSAGES_LIST_CHANGED',
+            'LAST_CHAT_MESSAGE_CHANGED',
+            'NEW_MESSAGE',
+            'INIT_ORDER',
+            'NEW_ORDER',
+            'ORDERS_LIST_CHANGED',
+            'ORDER_STATUS_CHANGED'
+        ] | str, list[Handler]] = {}
+
+
+        self.plugins_load_order: list[str] = []
+        'Порядок загрузки плагинов.'
+
+        self.plugins: dict[str, Plugin] = {}
+        'Список загруженных плагинов.'
+
+
+        self.old_plugins: dict[str, PluginData] = {}
         self.disabled_plugins = cardinal_tools.load_disabled_plugins()
+
 
     def __init_account(self) -> None:
         """
@@ -213,17 +293,17 @@ class Cardinal(object):
                 greeting_text = cardinal_tools.create_greeting_text(self)
                 cardinal_tools.set_console_title(f"FunPay Cardinal - {self.account.username} ({self.account.id})")
                 for line in greeting_text.split("\n"):
-                    logger.info(line)
+                    log.info(line)
                 break
             except TimeoutError:
-                logger.error(_("crd_acc_get_timeout_err"))
+                log.error(_("crd_acc_get_timeout_err"))
             except (FunPayAPI.exceptions.UnauthorizedError, FunPayAPI.exceptions.RequestFailedError) as e:
-                logger.error(e.short_str())
-                logger.debug(f"TRACEBACK {e.short_str()}")
+                log.error(e.short_str())
+                log.debug(f"TRACEBACK {e.short_str()}")
             except:
-                logger.error(_("crd_acc_get_unexpected_err"))
-                logger.debug("TRACEBACK", exc_info=True)
-            logger.warning(_("crd_try_again_in_n_secs", 2))
+                log.error(_("crd_acc_get_unexpected_err"))
+                log.debug("TRACEBACK", exc_info=True)
+            log.warning(_("crd_try_again_in_n_secs", 2))
             time.sleep(2)
 
     def __update_profile(self, infinite_polling: bool = True, attempts: int = 0, update_telegram_profile: bool = True,
@@ -239,36 +319,46 @@ class Cardinal(object):
 
         :return: True, если информация обновлена, False, если превышено макс. кол-во попыток.
         """
-        logger.info(_("crd_getting_profile_data"))
-        # Получаем категории аккаунта.
+        log.info(_("crd_getting_profile_data"))
+
+        # ----------------------- Получаем категории аккаунта. ----------------------- #
         while attempts or infinite_polling:
             try:
                 profile = self.account.get_user(self.account.id)
                 break
             except TimeoutError:
-                logger.error(_("crd_profile_get_timeout_err"))
+                log.error(_("crd_profile_get_timeout_err"))
             except FunPayAPI.exceptions.RequestFailedError as e:
-                logger.error(e.short_str())
-                logger.debug(e)
+                log.error(e.short_str())
+                log.debug(e)
             except:
-                logger.error(_("crd_profile_get_unexpected_err"))
-                logger.debug("TRACEBACK", exc_info=True)
+                log.error(_("crd_profile_get_unexpected_err"))
+                log.debug("TRACEBACK", exc_info=True)
             attempts -= 1
-            logger.warning(_("crd_try_again_in_n_secs", 2))
+            log.warning(_("crd_try_again_in_n_secs", 2))
             time.sleep(2)
         else:
-            logger.error(_("crd_profile_get_too_many_attempts_err", attempts))
+            log.error(_("crd_profile_get_too_many_attempts_err", attempts))
             return False
+
 
         if update_main_profile:
             self.profile = profile
             self.curr_profile = profile
-            self.lots_ids = [i.id for i in profile.get_lots()]
-            logger.info(_("crd_profile_updated", len(profile.get_lots()), len(profile.get_sorted_lots(2))))
+            self.lot_shortcuts: list[LotShortcut] = getattr(self, 'lot_shortcuts', [])+profile.get_lots()
+            self.lots_ids = [i.id for i in self.lot_shortcuts]
+            log.info(_("crd_profile_updated", len(profile.get_lots()), len(profile.get_sorted_lots(2))))
+
+
         if update_telegram_profile:
             self.tg_profile = profile
             self.last_telegram_lots_update = datetime.datetime.now()
-            logger.info(_("crd_tg_profile_updated", len(profile.get_lots()), len(profile.get_sorted_lots(2))))
+            log.info(_("crd_tg_profile_updated", len(profile.get_lots()), len(profile.get_sorted_lots(2))))
+
+
+        self.run_handlers(self.handlers.get('PROFILE_UPDATE', []))
+
+
         return True
 
     def __init_telegram(self) -> None:
@@ -292,7 +382,7 @@ class Cardinal(object):
         return balance
 
     # Прочее
-    def raise_lots(self) -> int:
+    def raise_lots(self) -> int: # TODO Plugin
         """
         Пытается поднять лоты.
 
@@ -319,7 +409,7 @@ class Cardinal(object):
             try:
                 time.sleep(1)
                 self.account.raise_lots(subcat.category.id)
-                logger.info(_("crd_lots_raised", subcat.category.name))
+                log.info(_("crd_lots_raised", subcat.category.name))
                 raise_ok = True
                 last_time = self.raised_time.get(subcat.category.id)
                 self.raised_time[subcat.category.id] = new_time = int(time.time())  # locale
@@ -330,11 +420,11 @@ class Cardinal(object):
                 if e.error_message is not None:
                     error_text = e.error_message
                 if e.wait_time is not None:
-                    logger.warning(_("crd_raise_time_err", subcat.category.name, error_text,
+                    log.warning(_("crd_raise_time_err", subcat.category.name, error_text,
                                      cardinal_tools.time_to_str(e.wait_time)))
                     next_time = int(time.time()) + e.wait_time
                 else:
-                    logger.error(_("crd_raise_unexpected_err", subcat.category.name))
+                    log.error(_("crd_raise_unexpected_err", subcat.category.name))
                     time.sleep(10)
                     next_time = int(time.time()) + 1
                 self.raise_time[subcat.category.id] = next_time
@@ -344,17 +434,17 @@ class Cardinal(object):
             except Exception as e:
                 t = 10
                 if isinstance(e, FunPayAPI.exceptions.RequestFailedError) and e.status_code in (503, 403, 429):
-                    logger.warning(_("crd_raise_status_code_err", e.status_code, subcat.category.name))
+                    log.warning(_("crd_raise_status_code_err", e.status_code, subcat.category.name))
                     t = 60
                 else:
-                    logger.error(_("crd_raise_unexpected_err", subcat.category.name))
-                logger.debug("TRACEBACK", exc_info=True)
+                    log.error(_("crd_raise_unexpected_err", subcat.category.name))
+                log.debug("TRACEBACK", exc_info=True)
                 time.sleep(t)
                 next_time = int(time.time()) + 1
                 next_call = next_time if next_time < next_call else next_call
                 if not raise_ok:
                     continue
-            self.run_handlers(self.post_lots_raise_handlers, (self, subcat.category, error_text + time_delta))
+            self.old_run_handlers(self.post_lots_raise_handlers, (self, subcat.category, error_text + time_delta))
         return next_call if next_call < float("inf") else 10
 
     def get_order_from_object(self, obj: types.OrderShortcut | types.Message | types.ChatShortcut,
@@ -384,11 +474,11 @@ class Cardinal(object):
         for i in range(2, -1, -1):
             try:
                 obj._order = self.account.get_order(order_id)
-                logger.info(f"Получил информацию о заказе {obj._order}")  # locale
+                log.info(f"Получил информацию о заказе {obj._order}")  # locale
                 return obj._order
             except:
-                logger.warning(f"Произошла ошибка при получении заказа #{order_id}. Осталось {i} попыток.")  # locale
-                logger.debug("TRACEBACK", exc_info=True)
+                log.warning(f"Произошла ошибка при получении заказа #{order_id}. Осталось {i} попыток.")  # locale
+                log.debug("TRACEBACK", exc_info=True)
                 time.sleep(1)
         obj._order_attempt_error = True
 
@@ -474,7 +564,7 @@ class Cardinal(object):
                                                         self.old_mode_enabled,
                                                         self.keep_sent_messages_unread)
                         result.append(msg)
-                        logger.info(_("crd_msg_sent", chat_id))
+                        log.info(_("crd_msg_sent", chat_id))
                     elif isinstance(entity, int):
                         msg = self.account.send_image(chat_id, entity, chat_name,
                                                       interlocutor_id,
@@ -482,18 +572,18 @@ class Cardinal(object):
                                                       self.old_mode_enabled,
                                                       self.keep_sent_messages_unread)
                         result.append(msg)
-                        logger.info(_("crd_msg_sent", chat_id))
+                        log.info(_("crd_msg_sent", chat_id))
                     elif isinstance(entity, float):
                         time.sleep(entity)
                     break
                 except Exception as ex:
-                    logger.warning(_("crd_msg_send_err", chat_id))
-                    logger.debug("TRACEBACK", exc_info=True)
-                    logger.info(_("crd_msg_attempts_left", current_attempts))
+                    log.warning(_("crd_msg_send_err", chat_id))
+                    log.debug("TRACEBACK", exc_info=True)
+                    log.info(_("crd_msg_attempts_left", current_attempts))
                     current_attempts -= 1
                     time.sleep(1)
             else:
-                logger.error(_("crd_msg_no_more_attempts_err", chat_id))
+                log.error(_("crd_msg_no_more_attempts_err", chat_id))
                 return []
         return result
 
@@ -540,8 +630,8 @@ class Cardinal(object):
 
                 return result
             except:
-                logger.warning("Не удалось получить курс обмена. Осталось попыток: {i}")
-                logger.debug("TRACEBACK", exc_info=True)
+                log.warning("Не удалось получить курс обмена. Осталось попыток: {i}")
+                log.debug("TRACEBACK", exc_info=True)
                 time.sleep(1)
 
         raise Exception("Не удалось получить курс обмена: превышено количество попыток.")
@@ -557,21 +647,21 @@ class Cardinal(object):
         while attempts:
             try:
                 self.account.get(update_phpsessid=True)
-                logger.info(_("crd_session_updated"))
+                log.info(_("crd_session_updated"))
                 return True
             except TimeoutError:
-                logger.warning(_("crd_session_timeout_err"))
+                log.warning(_("crd_session_timeout_err"))
             except (FunPayAPI.exceptions.UnauthorizedError, FunPayAPI.exceptions.RequestFailedError) as e:
-                logger.error(e.short_str)
-                logger.debug(e)
+                log.error(e.short_str)
+                log.debug(e)
             except:
-                logger.error(_("crd_session_unexpected_err"))
-                logger.debug("TRACEBACK", exc_info=True)
+                log.error(_("crd_session_unexpected_err"))
+                log.debug("TRACEBACK", exc_info=True)
             attempts -= 1
-            logger.warning(_("crd_try_again_in_n_secs", 2))
+            log.warning(_("crd_try_again_in_n_secs", 2))
             time.sleep(2)
         else:
-            logger.error(_("crd_session_no_more_attempts_err"))
+            log.error(_("crd_session_no_more_attempts_err"))
             return False
 
     # Бесконечные циклы
@@ -579,7 +669,18 @@ class Cardinal(object):
         """
         Запускает хэндлеры, привязанные к тому или иному событию.
         """
+        log.info('Запускаю обработчик событий.')
         instance_id = self.run_id
+        event_handlers = {
+            EventTypes.INITIAL_CHAT: 'INIT_MESSAGE',
+            EventTypes.CHATS_LIST_CHANGED: 'MESSAGES_LIST_CHANGED',
+            EventTypes.LAST_CHAT_MESSAGE_CHANGED: 'LAST_CHAT_MESSAGE_CHANGED',
+            EventTypes.NEW_MESSAGE: 'NEW_MESSAGE',
+            EventTypes.INITIAL_ORDER: 'INIT_ORDER',
+            EventTypes.ORDERS_LIST_CHANGED: 'ORDERS_LIST_CHANGED',
+            EventTypes.NEW_ORDER: 'NEW_ORDER',
+            EventTypes.ORDER_STATUS_CHANGED: 'ORDER_STATUS_CHANGED'
+        }
         events_handlers = {
             FunPayAPI.events.EventTypes.INITIAL_CHAT: self.init_message_handlers,
             FunPayAPI.events.EventTypes.CHATS_LIST_CHANGED: self.messages_list_changed_handlers,
@@ -595,17 +696,18 @@ class Cardinal(object):
         for event in self.runner.listen(requests_delay=int(self.MAIN_CFG["Other"]["requestsDelay"])):
             if instance_id != self.run_id:
                 break
-            self.run_handlers(events_handlers[event.type], (self, event))
+            self.run_handlers(self.handlers.get(event_handlers[event.type], []), event)
+            self.old_run_handlers(events_handlers[event.type], (self, event))
 
     def lots_raise_loop(self):
         """
         Запускает бесконечный цикл поднятия категорий (если autoRaise в _main.cfg == 1)
         """
         if not self.profile.get_lots():
-            logger.info(_("crd_raise_loop_not_started"))
+            log.info(_("crd_raise_loop_not_started"))
             return
 
-        logger.info(_("crd_raise_loop_started"))
+        log.info(_("crd_raise_loop_started"))
         while True:
             try:
                 if not self.MAIN_CFG["FunPay"].getboolean("autoRaise"):
@@ -617,13 +719,13 @@ class Cardinal(object):
                     continue
                 time.sleep(delay)
             except:
-                logger.debug("TRACEBACK", exc_info=True)
+                log.debug("TRACEBACK", exc_info=True)
 
     def update_session_loop(self):
         """
         Запускает бесконечный цикл обновления данных о пользователе.
         """
-        logger.info(_("crd_session_loop_started"))
+        log.info(_("crd_session_loop_started"))
         sleep_time = 3600
         while True:
             time.sleep(sleep_time)
@@ -636,42 +738,39 @@ class Cardinal(object):
         Инициализирует кардинал: регистрирует хэндлеры, инициализирует и запускает Telegram бота,
         получает данные аккаунта и профиля.
         """
-        self.add_handlers_from_plugin(handlers)
-        self.add_handlers_from_plugin(announcements)
+        log.info('Инициализирую кардинал.')
+
+
+        self.get_plugins()
         self.load_plugins()
-        self.add_handlers()
+        self.init_plugins()
+        self.add_handlers_from_plugins()
+
+        self.old_add_handlers_from_plugin(handlers) # TODO Plugin
+        self.old_add_handlers_from_plugin(announcements) # TODO Plugin
+        self.old_load_plugins()
+        self.old_add_handlers()
+
 
         if self.MAIN_CFG["Telegram"].getboolean("enabled"):
             self.__init_telegram()
             for module in [auto_response_cp, auto_delivery_cp, config_loader_cp, templates_cp, plugins_cp,
                            file_uploader, authorized_users_cp, proxy_cp, default_cp]:
-                self.add_handlers_from_plugin(module)
+                self.old_add_handlers_from_plugin(module)
 
-        self.run_handlers(self.pre_init_handlers, (self,))
+        self.run_handlers(self.handlers.get('PRE_INIT', []))
+        self.old_run_handlers(self.pre_init_handlers, (self,))
 
         if self.MAIN_CFG["Telegram"].getboolean("enabled"):
             self.telegram.setup_commands()
-            try:
-                self.telegram.edit_bot()
-            except AttributeError:  # todo убрать когда-то
-                logger.warning("Произошла ошибка при изменении бота Telegram. Обновляю библиотеку...")
-                logger.debug("TRACEBACK", exc_info=True)
-                try:
-                    main(["install", "-U", "pytelegrambotapi==4.15.2"])
-                    logger.info("Библиотека обновлена.")
-                except:
-                    logger.warning("Произошла ошибка при обновлении библиотеки.")
-                    logger.debug("TRACEBACK", exc_info=True)
-            except:
-                logger.warning("Произошла ошибка при изменении бота Telegram.")
-                logger.debug("TRACEBACK", exc_info=True)
 
             Thread(target=self.telegram.run, daemon=True).start()
 
         self.__init_account()
         self.runner = FunPayAPI.Runner(self.account, self.old_mode_enabled)
         self.__update_profile()
-        self.run_handlers(self.post_init_handlers, (self,))
+        self.run_handlers(self.handlers.get('POST_INIT', []))
+        self.old_run_handlers(self.post_init_handlers, (self,))
         return self
 
     def run(self):
@@ -680,8 +779,10 @@ class Cardinal(object):
         """
         self.run_id += 1
         self.start_time = int(time.time())
-        self.run_handlers(self.pre_start_handlers, (self,))
-        self.run_handlers(self.post_start_handlers, (self,))
+        self.run_handlers(self.handlers.get('PRE_START', []))
+        self.old_run_handlers(self.pre_start_handlers, (self,))
+        self.run_handlers(self.handlers.get('POST_START', []))
+        self.old_run_handlers(self.post_start_handlers, (self,))
 
         Thread(target=self.lots_raise_loop, daemon=True).start()
         Thread(target=self.update_session_loop, daemon=True).start()
@@ -692,8 +793,10 @@ class Cardinal(object):
         Запускает кардинал после остановки. Не используется.
         """
         self.run_id += 1
-        self.run_handlers(self.pre_start_handlers, (self,))
-        self.run_handlers(self.post_start_handlers, (self,))
+        self.run_handlers(self.handlers.get('PRE_START', []))
+        self.old_run_handlers(self.pre_start_handlers, (self,))
+        self.run_handlers(self.handlers.get('POST_START', []))
+        self.old_run_handlers(self.post_start_handlers, (self,))
         self.process_events()
 
     def stop(self):
@@ -701,8 +804,10 @@ class Cardinal(object):
         Останавливает кардинал. Не используется.
         """
         self.run_id += 1
-        self.run_handlers(self.pre_stop_handlers, (self,))
-        self.run_handlers(self.post_stop_handlers, (self,))
+        self.run_handlers(self.handlers.get('PRE_STOP', []))
+        self.old_run_handlers(self.pre_stop_handlers, (self,))
+        self.run_handlers(self.handlers.get('POST_STOP', []))
+        self.old_run_handlers(self.post_stop_handlers, (self,))
 
     def update_lots_and_categories(self):
         """
@@ -724,7 +829,7 @@ class Cardinal(object):
             self.runner.by_bot_ids = {}
 
     @staticmethod
-    def save_config(config: configparser.ConfigParser, file_path: str) -> None:
+    def save_config(config: ConfigParser, file_path: str) -> None:
         """
         Сохраняет конфиг в указанный файл.
 
@@ -764,7 +869,7 @@ class Cardinal(object):
         return True
 
     @staticmethod
-    def load_plugin(from_file: str) -> tuple:
+    def old_load_plugin(from_file: str) -> tuple:
         """
         Создает модуль из переданного файла-плагина и получает необходимые поля для PluginData.
         :param from_file: путь до файла-плагина.
@@ -787,16 +892,16 @@ class Cardinal(object):
             result[i] = value
         return plugin, result
 
-    def load_plugins(self):
+    def old_load_plugins(self):
         """
         Импортирует все плагины из папки plugins.
         """
         if not os.path.exists("plugins"):
-            logger.warning(_("crd_no_plugins_folder"))
+            log.warning(_("crd_no_plugins_folder"))
             return
         plugins = [file for file in os.listdir("plugins") if file.endswith(".py")]
         if not plugins:
-            logger.info(_("crd_no_plugins"))
+            log.info(_("crd_no_plugins"))
             return
 
         sys.path.append("plugins")
@@ -804,27 +909,27 @@ class Cardinal(object):
             try:
                 if not self.is_plugin(file):
                     continue
-                plugin, data = self.load_plugin(file)
+                plugin, data = self.old_load_plugin(file)
             except:
-                logger.error(_("crd_plugin_load_err", file))
-                logger.debug("TRACEBACK", exc_info=True)
+                log.error(_("crd_plugin_load_err", file))
+                log.debug("TRACEBACK", exc_info=True)
                 continue
 
             if not self.is_uuid_valid(data["UUID"]):
-                logger.error(_("crd_invalid_uuid", file))
+                log.error(_("crd_invalid_uuid", file))
                 continue
 
-            if data["UUID"] in self.plugins:
-                logger.error(_("crd_uuid_already_registered", data['UUID'], data['NAME']))
+            if data["UUID"] in self.old_plugins:
+                log.error(_("crd_uuid_already_registered", data['UUID'], data['NAME']))
                 continue
 
             plugin_data = PluginData(data["NAME"], data["VERSION"], data["DESCRIPTION"], data["CREDITS"], data["UUID"],
                                      f"plugins/{file}", plugin, data["SETTINGS_PAGE"], data["BIND_TO_DELETE"],
                                      False if data["UUID"] in self.disabled_plugins else True)
 
-            self.plugins[data["UUID"]] = plugin_data
+            self.old_plugins[data["UUID"]] = plugin_data
 
-    def add_handlers_from_plugin(self, plugin, uuid: str | None = None):
+    def old_add_handlers_from_plugin(self, plugin, uuid: str | None = None):
         """
         Добавляет хэндлеры из плагина + присваивает каждому хэндлеру UUID плагина.
 
@@ -837,19 +942,20 @@ class Cardinal(object):
             except AttributeError:
                 continue
             for func in functions:
+                log.debug(f'Добавляю хендлер {getattr(func, '__name__', func)} ({uuid}, {name})')
                 func.plugin_uuid = uuid
             self.handler_bind_var_names[name].extend(functions)
-        logger.info(_("crd_handlers_registered", plugin.__name__))
+        log.info(_("crd_handlers_registered", plugin.__name__))
 
-    def add_handlers(self):
+    def old_add_handlers(self):
         """
         Регистрирует хэндлеры из всех плагинов.
         """
-        for i in self.plugins:
-            plugin = self.plugins[i].plugin
-            self.add_handlers_from_plugin(plugin, i)
+        for i in self.old_plugins:
+            plugin = self.old_plugins[i].plugin
+            self.old_add_handlers_from_plugin(plugin, i)
 
-    def run_handlers(self, handlers_list: list[Callable], args) -> None:
+    def old_run_handlers(self, handlers_list: list[Callable], args) -> None:
         """
         Выполняет функции из списка handlers.
 
@@ -859,7 +965,8 @@ class Cardinal(object):
         for func in handlers_list:
             try:
                 plugin_uuid = getattr(func, "plugin_uuid")
-                if plugin_uuid is None or (plugin_uuid in self.plugins and self.plugins[plugin_uuid].enabled):
+                if plugin_uuid is None or (plugin_uuid in self.old_plugins and self.old_plugins[plugin_uuid].enabled):
+                    log.debug(f'old_run_handlers: Запускаю хендлер {getattr(func, '__name__', func)} ({plugin_uuid})')
                     func(*args)
             except Exception as ex:
                 text = _("crd_handler_err")
@@ -867,8 +974,8 @@ class Cardinal(object):
                     text += f" {ex.short_str()}"
                 except:
                     pass
-                logger.error(text)
-                logger.debug("TRACEBACK", exc_info=True)
+                log.error(text)
+                log.debug("TRACEBACK", exc_info=True)
                 continue
 
     def add_telegram_commands(self, uuid: str, commands: list[tuple[str, str, bool]]):
@@ -882,11 +989,11 @@ class Cardinal(object):
         :param uuid: UUID плагина.
         :param commands: список команд (без "/")
         """
-        if uuid not in self.plugins:
+        if uuid not in self.old_plugins:
             return
 
         for i in commands:
-            self.plugins[uuid].commands[i[0]] = i[1]
+            self.old_plugins[uuid].commands[i[0]] = i[1]
             if i[2] and self.telegram:
                 self.telegram.add_command_to_menu(i[0], i[1])
 
@@ -895,12 +1002,393 @@ class Cardinal(object):
         Активирует / деактивирует плагин.
         :param uuid: UUID плагина.
         """
-        self.plugins[uuid].enabled = not self.plugins[uuid].enabled
-        if self.plugins[uuid].enabled and uuid in self.disabled_plugins:
+        self.old_plugins[uuid].enabled = not self.old_plugins[uuid].enabled
+        if self.old_plugins[uuid].enabled and uuid in self.disabled_plugins:
             self.disabled_plugins.remove(uuid)
-        elif not self.plugins[uuid].enabled and uuid not in self.disabled_plugins:
+        elif not self.old_plugins[uuid].enabled and uuid not in self.disabled_plugins:
             self.disabled_plugins.append(uuid)
         cardinal_tools.cache_disabled_plugins(self.disabled_plugins)
+
+
+    # ---------------------------------------------------------------------------- #
+    #                                    Плагины                                   #
+    # ---------------------------------------------------------------------------- #
+
+    # ----------------------------- Загрузка плагинов ---------------------------- #
+    def get_plugins(self):
+        'Получает все плагины из папки plugins. Не импортирует модули.'
+        log.debug('Получаю плагины.')
+
+        plugins_count = 0
+        plugin_dirs = (Path(__file__).parent / 'plugins').iterdir()
+
+        for plugin_dir in plugin_dirs:
+            plugin_path = plugin_dir / 'plugin.py'
+            # ---------- Если нет plugin_info.json или plugin.py - это не плагин --------- #
+            if any([
+                not plugin_path.exists(),
+                not (plugin_dir / 'plugin_info.json').exists()
+            ]): continue
+
+            plugin_uuid, plugin_raw_info = self.get_plugin_raw_info(plugin_dir)
+
+            plugin = Plugin(
+                uuid=plugin_uuid,
+                name=plugin_raw_info['NAME'],
+                description=plugin_raw_info['DESCRIPTION'],
+                credits=plugin_raw_info['CREDITS'],
+                dir=plugin_dir,
+                dependencies=plugin_raw_info['dependencies'],
+                raw_info=plugin_raw_info
+            )
+
+            self.plugins[plugin.uuid] = plugin
+            plugins_count+=1
+
+        log.debug(f'Плагины ({plugins_count}) успешно получены.')
+
+        return
+
+
+    @staticmethod
+    def get_plugin_raw_info(plugin_dir: Path) -> tuple[str, dict[str, Any]]:
+        '''
+        Возвращает информацию о плагине.
+
+        :param plugin_dir: Путь к плагину.
+        :type plugin_dir: Path
+        :return: Информация о плагине.
+        :rtype: dict[str, Any]
+        '''
+        log.debug(f'Получаю информацию о плагине "{plugin_dir}".')
+
+        plugin_info_path = plugin_dir / 'plugin_info.json'
+        plugin_dependencies_path = plugin_dir / 'dependencies.json'
+        with open(plugin_info_path) as fp: plugin_info = json.load(fp)
+
+        if plugin_dependencies_path.exists():
+            with open(plugin_dependencies_path) as fp: plugin_dependencies = json.load(fp)
+        else: plugin_dependencies = {}
+
+        return plugin_info['UUID'], {
+            'NAME': plugin_info['NAME'],
+            'VERSION': plugin_info['VERSION'],
+            'DESCRIPTION': plugin_info['DESCRIPTION'],
+            'CREDITS': plugin_info['CREDITS'],
+            'dependencies': plugin_dependencies,
+            'plugin_dir': plugin_dir
+        }
+
+
+    def load_plugins(self):
+        'Загружает полученные плагины.'
+        log.debug('Загружаю плагины.')
+
+        plugins_raw_info = {plugin.uuid: plugin.raw_info for plugin in self.plugins.values()}
+
+        plugins_raw_info = self.set_plugins_load_order(plugins_raw_info)
+
+        self.get_plugins_load_order(plugins_raw_info)
+
+        plugins_count = 0
+
+        for plugin_uuid in self.plugins_load_order:
+            try:
+                self.load_plugin(plugin_uuid)
+
+                plugins_count+=1
+            except:
+                log.error(f'Не удалось загрузить плагин {plugin_uuid}.')
+
+
+        log.debug(f'Плагины ({plugins_count}) успешно загружены.')
+
+
+    @staticmethod
+    def set_plugins_load_order(plugins_raw_info: dict[str, dict]) -> dict[str, dict]:
+        '''
+        Присваивает плагинам порядок загрузки.
+
+        :param plugins_raw_info: Список плагинов.
+        :type plugins_raw_info: dict
+        :return: Список плагинов с порядком загрузки.
+        :rtype: dict
+        '''
+        log.debug(f'Присваиваю {len(plugins_raw_info)} плагинам(-у) порядок загрузки.')
+
+        result = plugins_raw_info.copy()
+
+        for plugin_uuid in plugins_raw_info:
+            result = Cardinal.set_plugin_load_order(plugin_uuid, result)
+
+
+        log.debug(f'Успешно присвоил порядок загрузки {len(plugins_raw_info)} плагинам(-у).')
+
+        return result
+
+
+    @staticmethod
+    def set_plugin_load_order(plugin_uuid: str, plugins_raw_info: dict[str, dict]) -> dict[str, dict]:
+        '''
+        Присваивает плагину порядок загрузки, исходя из его зависимостей.
+
+        :param plugin_uuid: UUID плагина.
+        :type plugin_uuid: str
+        :param plugins_raw_info: Список плагинов
+        :type plugins_raw_info: dict
+        :return: Список плагинов.
+        :rtype: dict
+        '''
+        plugin_raw_info = plugins_raw_info[plugin_uuid]
+
+        # ---------- Если плагину уже присвоен порядок загрузки - пропустить --------- #
+        if hasattr(plugin_raw_info, 'load_order'):
+            return plugins_raw_info
+
+        # ------------ Если у плагина нет зависимостей - загружать первым ------------ #
+        if not plugin_raw_info['dependencies']:
+            plugin_raw_info['load_order'] = 0
+            plugins_raw_info[plugin_uuid] = plugin_raw_info
+
+        # ----- Если у плагина есть зависимости - присвоить каждой из них порядок ---- #
+        # ------------------ загрузки, а плагин загрузить после них ------------------ #
+        else:
+            load_order = 0
+
+            for dependency in plugin_raw_info['dependencies']:
+                if not hasattr(plugins_raw_info[dependency], 'load_order'): plugins_raw_info = Cardinal.set_plugin_load_order(dependency, plugins_raw_info)
+
+                load_order = max(load_order, plugins_raw_info[dependency]['load_order']+1)
+
+            plugin_raw_info['load_order'] = load_order
+
+        return plugins_raw_info
+
+
+    @staticmethod
+    def get_module(module_path: Path):
+        '''
+        Загружает модуль по указанному пути.
+
+        :param module_path: Путь к модулю.
+        :type module_path: Path
+        :raises ModuleImportError: Ошибка при загрузке модуля.
+        :return: Модуль.
+        :rtype: ModuleType
+        '''
+        log.debug(f'Загружаю модуль "{module_path.stem}" ({module_path}).')
+
+        try:
+            spec = importlib.util.spec_from_file_location(module_path.stem, module_path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+        except: raise ModuleImportError(module_path)
+
+
+        log.debug(f'Модуль "{module.__name__}" ({module_path}) успешно загружен.')
+        return module
+
+
+    def get_plugins_load_order(self, plugins_raw_info: dict[str, dict]):
+        '''
+        Получает порядок загрузки плагинов из информации о плагинах.
+
+        :param plugins_raw_info: Информация о плагинах.
+        :type plugins_raw_info: dict
+        '''
+        log.debug(f'Получаю порядок загрузки плагинов.')
+
+        self.plugins_load_order = list(plugins_raw_info)
+
+        self.plugins_load_order.sort(key=lambda u: plugins_raw_info[u]['load_order'])
+
+        log.debug(f'Порядок загрузки плагинов успешно получен: {self.plugins_load_order}')
+
+
+    def load_plugin(self, plugin_uuid: str):
+        '''
+        Загружает модуль плагина.
+
+        :param module: Модуль.
+        :type module: ModuleType
+        :param module_path: Путь к модулю.
+        :type module_path: Path
+        :raises PluginFieldNotExistsError: Отсутствует необходимое поле в модуле.
+        '''
+        plugin = self.plugins[plugin_uuid]
+
+        log.debug(f'Загружаю плагин {plugin.name} ({plugin.uuid}).')
+
+        if all([
+            not self.config.config.load_all_plugins,
+            not plugin_uuid in self.config.config.trusted_plugins
+        ]): raise PluginNotTrustedException(plugin)
+
+
+        if any([
+            not self.plugins[dependency].module for dependency in plugin.dependencies
+        ]):
+            log.error(
+                f'Плагин {self.plugins[plugin_uuid].name} ({plugin_uuid}) не будет загружен, '\
+                f'т.к. не были загружены все его зависимости ({list(plugin.dependencies.keys())}).'
+            )
+
+            raise Exception() # TODO
+
+
+        plugin_path = plugin.dir / 'plugin.py'
+
+        try:
+            plugin.module = self.get_module(plugin_path)
+        except:
+            log.error(f'Не удалось загрузить плагин {plugin.name} ({plugin.uuid}).')
+            log.debug('TRACEBACK', exc_info=True)
+
+            raise Exception() # TODO
+
+
+        if hasattr(plugin.module, 'LOAD_PLUGIN'):
+            log.debug(f'Запускаю хендлеры при загрузке плагина {plugin.name} ({plugin.uuid}).')
+            init_plugin_handlers = [
+                Handler(
+                    plugin.uuid,
+                    'LOAD_PLUGIN',
+                    0,
+                    func
+                ) for func in getattr(plugin.module, 'LOAD_PLUGIN')
+            ]
+            self.run_handlers(init_plugin_handlers)
+
+
+        log.debug(f'Плагин {plugin.name} ({plugin.uuid}) успешно загружен.')
+
+        return
+
+
+    def init_plugins(self):
+        'Инициализирует все загруженные плагины.'
+        log.debug(f'Инициализирую плагины ({len(self.plugins)}).')
+
+        for plugin in self.plugins.values():
+            try: self.init_plugin(plugin, self.event_var_names)
+            except:
+                log.error(f'Ошибка при инициализации плагина {plugin.name} ({plugin.uuid}).')
+                log.debug('TRACEBACK', exc_info=True)
+
+        log.info('Все плагины инициализированы.')
+
+
+    def init_plugin(self, plugin: Plugin, event_var_names: list[str]):
+        '''
+        Загружает хендлеры из плагина.
+
+        :param plugin: Плагин.
+        :type plugin: Plugin
+        :param event_var_names: Список алиасов хендлеров.
+        :type event_var_names: list[str]
+        '''
+        log.debug(f'Инициализирую плагин {plugin.name} ({plugin.uuid}).')
+
+
+        if hasattr(plugin.module, 'INIT_PLUGIN'):
+            log.debug(f'Запускаю хендлеры при инициализации плагина {plugin.name} ({plugin.uuid}).')
+            init_plugin_handlers = [
+                Handler(
+                    plugin.uuid,
+                    'INIT_PLUGIN',
+                    0,
+                    func
+                ) for func in getattr(plugin.module, 'INIT_PLUGIN')
+            ]
+            self.run_handlers(init_plugin_handlers)
+
+
+        for event_name in event_var_names:
+            if hasattr(plugin.module, event_name):
+                log.debug(f'Получаю хендлеры {event_name}: {getattr(plugin.module, event_name)} ({plugin.uuid}).')
+
+                for handler_value in getattr(plugin.module, event_name):
+                    handler = Handler(
+                        plugin.uuid,
+                        event_name,
+                        handler_value['priority'],
+                        handler_value['handler']
+                    )
+
+                    plugin.handlers[event_name] = [*plugin.handlers.get(event_name, []), handler]
+
+
+    def add_handlers_from_plugins(self):
+        'Добавляет хендлеры из всех загруженных плагинов.'
+        log.debug(f'Загружаю хендлеры из плагинов ({len(self.plugins)}).')
+
+        for plugin in self.plugins.values(): self.add_handlers_from_plugin(plugin)
+
+
+    def add_handlers_from_plugin(self, plugin: Plugin):
+        '''
+        Добавляет хендлеры из плагина в кардинал.
+
+        :param plugin: Плагин.
+        :type plugin: Plugin
+        '''
+        log.debug(f'Загружаю хендлеры из плагина {plugin.name} ({plugin.uuid}).')
+
+        for event_name, handlers in plugin.handlers.items():
+            log.debug(f'Добавляю хендлеры {event_name}: {handlers} ({plugin.uuid}).')
+            for handler in handlers: self.add_handler(handler, event_name)
+
+
+    def add_handler(self, handler: Handler, event_var_name: str):
+        '''
+        Добавляет хендлер в кардинал.
+
+        :param handler: Хендлер.
+        :type handler: Handler
+        :param event_var_name: Алиас события хендлера.
+        :type event_var_name: str
+        '''
+        log.debug(f'Добавляю хендлер {handler.func.__name__} ({handler.plugin_uuid}) в хендлеры {event_var_name}.')
+
+        self.handlers[event_var_name] = [*self.handlers.get(event_var_name, []), handler]
+
+
+    def run_handlers(self, handlers: list[Handler], *args, **kwargs):
+        '''
+        Запускает все хендлеры из списка с указанными аргументами
+
+        :param handlers: Список хендлеров.
+        :type handlers: list[Handler]
+        '''
+        handlers.sort(key=lambda h: h.priority if h.priority >= 0 else inf)
+
+
+        log.debug(f'Запускаю хендлеры {handlers}. \nargs={args} \nkwargs={kwargs}')
+
+        for handler in handlers: self.run_handler(handler, *args, **kwargs)
+
+
+    def run_handler(self, handler: Handler, *args, **kwargs):
+        '''
+        Запускает хендлер с указанными аргументами.
+
+        :param handler: Хендлер.
+        :type handler: Handler
+        '''
+        log.debug(f'Запускаю хендлер {getattr(handler.func, __name__, handler.plugin_uuid)}. \nargs={args} \nkwargs={kwargs}')
+
+        try: handler.func(self, *args, **kwargs)
+        except:
+            log.warning(f'Ошибка при выполнении хендлера {getattr(handler.func, __name__, handler.plugin_uuid)}. \n(args={args}; kwargs={kwargs})')
+            log.debug(f'args={args} \nkwargs={kwargs}')
+            log.debug('TRACEBACK', exc_info=True)
+
+
+    # --------------------------------- Настройки -------------------------------- #
+    @property
+    def config(self):
+        return Config(self.name)
+
 
     # Настройки
     @property
