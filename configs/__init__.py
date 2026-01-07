@@ -41,6 +41,11 @@ class Config:
         'Настройки.'
 
 
+    def __getattribute__(self, name):
+        try: return super().__getattribute__(name)
+        except: return self.config.get(name)
+
+
     def __get_config(
             self,
             section: str | None = None

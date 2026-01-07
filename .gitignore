@@ -13,5 +13,10 @@ storage
 
 
 __pycache__
+
+
 test.py
 tests
+
+env
+pyenv

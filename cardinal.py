@@ -62,12 +62,11 @@ localizer = Localizer()
 _ = localizer.translate
 
 
-def get_cardinal() -> None | Cardinal:
+def get_cardinal(name: str) -> None | Cardinal:
     """
     Возвращает существующий экземпляр кардинала.
     """
-    if hasattr(Cardinal, "instance"):
-        return getattr(Cardinal, "instance")
+    return Cardinal.instances.get(name)
 
 
 class PluginData:
@@ -108,18 +107,26 @@ class Cardinal(object):
     'Список запущенных экземпляров кардинала.'
 
 
-    def __new__(cls, *args, **kwargs):
-        if not hasattr(cls, "instance"):
-            cls.instance = super(Cardinal, cls).__new__(cls)
-        return getattr(cls, "instance")
+    def __new__(cls, name: str, *args, **kwargs):
+        if not name in cls.instances:
+            cls.instances[name] = super().__new__(cls)
+
+        return cls.instances[name]
 
 
-    def __init__(self, main_config: ConfigParser,
+    def __init__(self, name: str,
+                 main_config: ConfigParser,
                  auto_delivery_config: ConfigParser,
                  auto_response_config: ConfigParser,
                  raw_auto_response_config: ConfigParser,
                  version: str):
-        self.name = 'Cardinal'
+        if hasattr(self, 'initiated'):
+            return
+
+        self.initiated = True
+        'Флаг инициализации (Всегда True, предотвращает повторную инициализацию экземпляра).'
+
+        self.name = name
         'Имя экземпляра.'
 
         self.VERSION = version
@@ -241,7 +248,7 @@ class Cardinal(object):
             'POST_START',
             'PRE_STOP',
             'POST_STOP',
-            'INIT_MESSAGE',
+            'INIT_CHAT',
             'MESSAGES_LIST_CHANGED',
             'LAST_CHAT_MESSAGE_CHANGED',
             'NEW_MESSAGE',
@@ -260,7 +267,7 @@ class Cardinal(object):
             'POST_START',
             'PRE_STOP',
             'POST_STOP',
-            'INIT_MESSAGE',
+            'INIT_CHAT',
             'MESSAGES_LIST_CHANGED',
             'LAST_CHAT_MESSAGE_CHANGED',
             'NEW_MESSAGE',
@@ -672,7 +679,7 @@ class Cardinal(object):
         log.info('Запускаю обработчик событий.')
         instance_id = self.run_id
         event_handlers = {
-            EventTypes.INITIAL_CHAT: 'INIT_MESSAGE',
+            EventTypes.INITIAL_CHAT: 'INIT_CHAT',
             EventTypes.CHATS_LIST_CHANGED: 'MESSAGES_LIST_CHANGED',
             EventTypes.LAST_CHAT_MESSAGE_CHANGED: 'LAST_CHAT_MESSAGE_CHANGED',
             EventTypes.NEW_MESSAGE: 'NEW_MESSAGE',
@@ -1035,6 +1042,7 @@ class Cardinal(object):
             plugin = Plugin(
                 uuid=plugin_uuid,
                 name=plugin_raw_info['NAME'],
+                version=plugin_raw_info['VERSION'],
                 description=plugin_raw_info['DESCRIPTION'],
                 credits=plugin_raw_info['CREDITS'],
                 dir=plugin_dir,
@@ -1064,10 +1072,10 @@ class Cardinal(object):
 
         plugin_info_path = plugin_dir / 'plugin_info.json'
         plugin_dependencies_path = plugin_dir / 'dependencies.json'
-        with open(plugin_info_path) as fp: plugin_info = json.load(fp)
+        with open(plugin_info_path, encoding='utf-8') as fp: plugin_info = json.load(fp)
 
         if plugin_dependencies_path.exists():
-            with open(plugin_dependencies_path) as fp: plugin_dependencies = json.load(fp)
+            with open(plugin_dependencies_path, encoding='utf-8') as fp: plugin_dependencies = json.load(fp)
         else: plugin_dependencies = {}
 
         return plugin_info['UUID'], {
@@ -1097,11 +1105,16 @@ class Cardinal(object):
                 self.load_plugin(plugin_uuid)
 
                 plugins_count+=1
+            except PluginNotTrustedException:
+                log.warning(f'Плагин {plugin_uuid} не будет загружен, так как отсутствует в trusted_plugins')
             except:
                 log.error(f'Не удалось загрузить плагин {plugin_uuid}.')
+                log.debug('TRACEBACK', exc_info=True)
 
 
         log.debug(f'Плагины ({plugins_count}) успешно загружены.')
+
+        return
 
 
     @staticmethod
