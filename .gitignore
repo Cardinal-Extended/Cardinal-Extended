@@ -5,8 +5,7 @@ env
 pyenv
 
 
-plugins/*
-
+plugins
 
 logs
 
