@@ -1,19 +1,15 @@
-'''В данном модуле написаны форматтеры для логгера.'''
-import os
+'В данном модуле написаны форматтеры для логгера.'
+from . import CLEAR_RE
 
 
 from logging import Formatter, LogRecord, PercentStyle
-from pathlib import Path
-from colorama import Fore, Back, Style
-import re
+from colorama import Fore, Back
 
 
-CLEAR_RE = re.compile(r'(\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]))|(\n)|(\r)')
-
-
-logs_path = Path(__file__).parent.parent / 'logs'
-if not logs_path.exists():
-    os.makedirs(logs_path)
+__all__ = [
+    'ColoredFormatter',
+    'FileFormatter'
+]
 
 
 class ColoredFormatter(Formatter):
@@ -21,20 +17,20 @@ class ColoredFormatter(Formatter):
         super(ColoredFormatter, self).__init__(datefmt='%Y-%m-%d %H:%M:%S')
         self.log_level_colors = {'DEBUG': '\033[94m', 'INFO': '\033[92m', 'WARNING': '\033[93m', 'ERROR': '\033[91m', 'CRITICAL': '\033[95m'}
         self.colors = {
-            "$YELLOW": Fore.YELLOW,
-            "$CYAN": Fore.CYAN,
-            "$MAGENTA": Fore.MAGENTA,
-            "$BLUE": Fore.BLUE,
-            "$GREEN": Fore.GREEN,
-            "$BLACK": Fore.BLACK,
-            "$WHITE": Fore.WHITE,
-            "$B_YELLOW": Back.YELLOW,
-            "$B_CYAN": Back.CYAN,
-            "$B_MAGENTA": Back.MAGENTA,
-            "$B_BLUE": Back.BLUE,
-            "$B_GREEN": Back.GREEN,
-            "$B_BLACK": Back.BLACK,
-            "$B_WHITE": Back.WHITE
+            '$YELLOW': Fore.YELLOW,
+            '$CYAN': Fore.CYAN,
+            '$MAGENTA': Fore.MAGENTA,
+            '$BLUE': Fore.BLUE,
+            '$GREEN': Fore.GREEN,
+            '$BLACK': Fore.BLACK,
+            '$WHITE': Fore.WHITE,
+            '$B_YELLOW': Back.YELLOW,
+            '$B_CYAN': Back.CYAN,
+            '$B_MAGENTA': Back.MAGENTA,
+            '$B_BLUE': Back.BLUE,
+            '$B_GREEN': Back.GREEN,
+            '$B_BLACK': Back.BLACK,
+            '$B_WHITE': Back.WHITE
         }
 
 

@@ -43,7 +43,7 @@ class Config:
 
     def __getattribute__(self, name):
         try: return super().__getattribute__(name)
-        except: return self.config.get(name)
+        except: return self.config[name]
 
 
     def __get_config(

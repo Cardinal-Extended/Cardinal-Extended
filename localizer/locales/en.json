@@ -1,0 +1,45 @@
+{
+    "c_ext_proxy_detected": "Proxy detected.",
+    "c_ext_checking_proxy": "Running proxy checks.",
+    "c_ext_proxy_err": "Failed to connect to the proxy. Make sure that the data is entered correctly.",
+    "c_ext_proxy_success": "Proxy verified successfully! IP address: $YELLOW{}$RESET.",
+
+
+    "c_ext_acc_get_timeout_err": "Failed to load account data: Timeout exceeded.",
+    "c_ext_acc_get_unexpected_err": "An unexpected error occurred while retrieving account information.",
+
+
+    "c_ext_getting_profile_data": "Getting lots and categories data.",
+    "c_ext_profile_get_timeout_err": "Failed to load account lots data: timeout exceeded.",
+    "c_ext_profile_get_unexpected_err": "An unexpected error occurred while retrieving data about the account's lots.",
+    "c_ext_profile_get_too_many_attempts_err": "An error occurred while getting data about the lots of the account: the number of attempts ({}) was exceeded.",
+    "c_ext_profile_updated": "Updated the information about profile lots $YELLOW({})$RESET and categories $YELLOW({})$RESET.",
+
+
+    "c_ext_session_updated": "Session updated.",
+    "c_ext_session_timeout_err": "Failed to refresh session: timeout exceeded.",
+    "c_ext_session_unexpected_err": "An unexpected error occurred while refreshing the session.",
+    "c_ext_session_no_more_attempts_err": "Failed to refresh session: the number of attempts was exceeded.",
+    "c_ext_starting_session_loop": "$CYANThe session refresh loop is starting.",
+    "c_ext_stopping_session_loop": "$BLUEThe session refresh loop is stopping.",
+
+
+    "c_ext_msg_sent": "Sent a message to the chat $YELLOW{}.",
+    "c_ext_msg_send_err": "An error occurred when sending a message to chat $YELLOW{}$RESET.",
+    "c_ext_msg_attempts_left": "Attempts left: $YELLOW{}$RESET.",
+    "c_ext_msg_no_more_attempts_err": "Failed to send a message to chat $YELLOW{}$RESET: the number of attempts exceeded.",
+
+
+    "c_ext_try_again_in_n_secs": "The next attempt is in {} seconds(-s).",
+
+
+    "c_ext_greetings_morning_part": "Good morning",
+    "c_ext_greetings_day_part": "Good day",
+    "c_ext_greetings_evening_part": "Good evening",
+    "c_ext_greetings_night_part": "What a beautiful night",
+    "c_ext_greetings_part_1": "* {}, $CYAN{}.",
+    "c_ext_greetings_part_2": "* Your ID: $YELLOW{}.",
+    "c_ext_greetings_part_3": "* Your current balance: $CYAN{} RUB $RESET| $MAGENTA{} USD $RESET| $YELLOW{} EUR",
+    "c_ext_greetings_part_4": "* Current pending orders: $YELLOW{}.",
+    "c_ext_greetings_part_5": "* Have a good trade!"
+}

@@ -1,0 +1,45 @@
+{
+    "c_ext_proxy_detected": "Обнаружен прокси.",
+    "c_ext_checking_proxy": "Выполняю проверку прокси.",
+    "c_ext_proxy_err": "Не удалось подключиться к прокси. Убедитесь, что данные введены верно.",
+    "c_ext_proxy_success": "Прокси успешно проверен! IP-адрес: $YELLOW{}$RESET.",
+
+
+    "c_ext_acc_get_timeout_err": "Не удалось загрузить данные об аккаунте: превышен тайм-аут ожидания.",
+    "c_ext_acc_get_unexpected_err": "Произошла непредвиденная ошибка при получении данных аккаунта.",
+
+
+    "c_ext_getting_profile_data": "Получаю данные о лотах и категориях.",
+    "c_ext_profile_get_timeout_err": "Не удалось загрузить данные о лотах аккаунта: превышен тайм-аут ожидания.",
+    "c_ext_profile_get_unexpected_err": "Произошла непредвиденная ошибка при получении данных о лотах и категориях.",
+    "c_ext_profile_get_too_many_attempts_err": "Произошло ошибка при получении данных о лотах и категориях: превышено кол-во попыток ({}).",
+    "c_ext_profile_updated": "Обновил информацию о лотах $YELLOW({})$RESET и категориях $YELLOW({})$RESET профиля.",
+
+
+    "c_ext_session_updated": "Сессия обновлена.",
+    "c_ext_session_timeout_err": "Не удалось обновить сессию: превышен тайм-аут ожидания.",
+    "c_ext_session_unexpected_err": "Произошла непредвиденная ошибка при обновлении сессии.",
+    "c_ext_session_no_more_attempts_err": "Не удалось обновить сессию: превышено кол-во попыток.",
+    "c_ext_starting_session_loop": "$CYANЗапускаю цикл обновления сессии.",
+    "c_ext_stopping_session_loop": "$BLUEОстанавливаю цикл обновления сессии.",
+
+
+    "c_ext_msg_sent": "Отправил сообщение в чат $YELLOW{}.",
+    "c_ext_msg_send_err": "Произошла ошибка при отправке сообщения в чат $YELLOW{}$RESET.",
+    "c_ext_msg_attempts_left": "Осталось попыток: $YELLOW{}$RESET.",
+    "c_ext_msg_no_more_attempts_err": "Не удалось отправить сообщение в чат $YELLOW{}$RESET: превышено кол-во попыток.",
+
+
+    "c_ext_try_again_in_n_secs": "Повторю попытку через {} секунд(-у/-ы).",
+
+
+    "c_ext_greetings_morning_part": "Доброе утро",
+    "c_ext_greetings_day_part": "Добрый день",
+    "c_ext_greetings_evening_part": "Добрый вечер",
+    "c_ext_greetings_night_part": "Какая прекрасная ночь",
+    "c_ext_greetings_part_1": "* {}, $CYAN{}.",
+    "c_ext_greetings_part_2": "* Ваш ID: $YELLOW{}.",
+    "c_ext_greetings_part_3": "* Ваш текущий баланс: $CYAN{} RUB $RESET| $MAGENTA{} USD $RESET| $YELLOW{} EUR",
+    "c_ext_greetings_part_4": "* Текущие незавершенные сделки: $YELLOW{}.",
+    "c_ext_greetings_part_5": "* Удачной торговли!"
+}

@@ -1,15 +1,14 @@
 
 configs/settings.toml
-configs/_main.cfg
-configs/auto_delivery.cfg
-configs/auto_response.cfg
+
+env
+pyenv
 
 
 plugins/*
 
 
 logs
-storage
 
 
 __pycache__
@@ -17,6 +16,3 @@ __pycache__
 
 test.py
 tests
-
-env
-pyenv

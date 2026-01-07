@@ -1,0 +1,35 @@
+[Cardinal]
+    language = "en" # Cardinal's language (logs, etc.)
+
+
+    [Cardinal.plugins]
+        load_all_plugins = false
+        trusted_plugins = [] # If load_all_plugins = false, load only these plugins
+
+
+    [Cardinal.proxy]
+        enable = false # Use proxy for FunPay requests
+
+        ip = ""
+        port = ""
+        login = ""
+        password = ""
+
+        check = false # Check proxy
+
+
+    [Cardinal.FunPay]
+        golden_key = "" # Session token FunPay
+        user_agent = "" # Browser user-agent
+
+
+        oldMsgGetMode = false
+
+        keepSentMessagesUnread = false
+
+
+    [Cardinal.Other]
+        requestsDelay = 4 # FunPay runner's requests delay
+
+
+        watermark = "🤖" # Watermark on bot's FunPay messages
