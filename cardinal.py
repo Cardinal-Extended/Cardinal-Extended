@@ -439,7 +439,7 @@ class Cardinal:
         '''
         Запускает хэндлеры, привязанные к тому или иному событию.
         '''
-        log.info('c_ext_starting_process_events_loop')
+        log.info(self.__translate('c_ext_starting_process_events_loop'))
 
         self.process_events_loop_running = True
 

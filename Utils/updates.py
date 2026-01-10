@@ -284,32 +284,20 @@ def install_release(folder_name: str) -> InstallUpdateResponses:
         if not release_folder.exists(): return InstallUpdateResponses.UPDATE_FOLDER_NOT_FOUND
 
 
-        delete_list_path = release_folder.joinpath('delete.json')
+        update_info_path = release_folder.joinpath('update.json')
 
-        if delete_list_path.exists():
-            with open(delete_list_path, "r", encoding="utf-8") as fp: data = json.loads(fp.read())
+        reboot_flag = False
 
+        if update_info_path.exists():
+            with open(update_info_path, "r", encoding="utf-8") as fp: data = json.loads(fp.read())
 
-            parent_folder = Path(__file__).parent.parent
-
-            for _ in data:
-                to_delete = parent_folder.joinpath(_)
-
-                if not to_delete.exists(): continue
-
-
-                if to_delete.is_file(): to_delete.unlink()
-
-                else: shutil.rmtree(to_delete, ignore_errors=True)
+            reboot_flag = data.get('reboot_required', False)
 
 
         for _ in release_folder.iterdir():
             file = _.name
 
-            if file == "delete.json": continue
-
-
-            if not reboot_flag and file in ['cardinal_manager.py', 'main.py']: reboot_flag = True
+            if file == 'update.json': continue
 
 
             if _.is_file(): shutil.copy2(_, file)
