@@ -11,16 +11,16 @@ import tomllib
 
 __all__ = [
     'Config',
-    'configs_dir',
-    'settings_path',
-    'logger_config_path',
+    'CONFIGS_DIR',
+    'SETTINGS_PATH',
+    'LOGGER_CONFIG_PATH',
 ]
 
 
-configs_dir = Path(__file__).parent
-settings_path = configs_dir / 'settings.toml'
-default_settings_path = configs_dir / 'default_settings.toml'
-logger_config_path = configs_dir / 'logger_config.toml'
+CONFIGS_DIR = Path(__file__).parent
+SETTINGS_PATH = CONFIGS_DIR / 'settings.toml'
+DEFAULT_SETTINGS_PATH = CONFIGS_DIR / 'default_settings.toml'
+LOGGER_CONFIG_PATH = CONFIGS_DIR / 'logger_config.toml'
 
 
 class Config:
@@ -51,7 +51,7 @@ class Config:
             section: str | None = None
     ) -> Dynaconf:
         return Dynaconf(
-            settings_files=[settings_path],
+            settings_files=[SETTINGS_PATH],
             environments=True if section else False,
             env=section
         )
@@ -60,7 +60,7 @@ class Config:
     @staticmethod
     def default() -> dict[str, Any]:
         'Стандартные настройки.'
-        with open(default_settings_path, 'rb') as fp: data = tomllib.load(fp)
+        with open(DEFAULT_SETTINGS_PATH, 'rb') as fp: data = tomllib.load(fp)
 
         return data
 
@@ -83,21 +83,21 @@ class Config:
             to_save = DynaBox(self.config) if isinstance(self.config, dict) else DynaBox(self.config.to_dict()).to_dict()
 
             if self.__section:
-                if settings_path.exists():
-                    with open(settings_path, 'rb') as fp: data = tomllib.load(fp)
+                if SETTINGS_PATH.exists():
+                    with open(SETTINGS_PATH, 'rb') as fp: data = tomllib.load(fp)
                 else: data = {}
 
                 data[self.__section] = to_save
 
             else: data = to_save
 
-            DynaLoaders.write(str(settings_path), data)
+            DynaLoaders.write(str(SETTINGS_PATH), data)
 
         else:
             data = DynaBox(self.config) if isinstance(self.config, dict) else DynaBox(self.config.to_dict()).to_dict()
 
             DynaLoaders.write(
-                str(settings_path),
+                str(SETTINGS_PATH),
                 data,
                 self.__section,
                 True if self.__section else False

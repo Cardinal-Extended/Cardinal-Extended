@@ -40,6 +40,12 @@ version=1
     propogate="True"
 
 
+    [loggers.CardinalManager]
+    handlers=["console_handler", "file_handler"]
+    level="DEBUG"
+    propogate="True"
+
+
     [loggers.C_EXT]
     handlers=["console_handler", "file_handler"]
     level="DEBUG"

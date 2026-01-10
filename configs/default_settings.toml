@@ -1,6 +1,10 @@
 [Cardinal]
     language = "en" # Cardinal's language (logs, etc.)
 
+    check_for_updates = true # Automatically check for Cardinal updates on GitHub
+    check_for_updates_delay = 600 # Delay in seconds
+    auto_update = false # Automatically update Cardinal from GitHub
+
 
     [Cardinal.plugins]
         load_all_plugins = false

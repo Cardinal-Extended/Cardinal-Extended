@@ -21,7 +21,8 @@
     "c_ext_session_unexpected_err": "Произошла непредвиденная ошибка при обновлении сессии.",
     "c_ext_session_no_more_attempts_err": "Не удалось обновить сессию: превышено кол-во попыток.",
     "c_ext_starting_session_loop": "$CYANЗапускаю цикл обновления сессии.",
-    "c_ext_stopping_session_loop": "$BLUEОстанавливаю цикл обновления сессии.",
+
+    "c_ext_starting_check_cardinal_updates_loop": "$CYANЗапускаю цикл проверки обновлений Кардинала (это не значит, что автопроверка обновлений включена).",
 
 
     "c_ext_msg_sent": "Отправил сообщение в чат $YELLOW{}.",

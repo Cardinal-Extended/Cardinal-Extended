@@ -9,9 +9,10 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING: from importlib._bootstrap import ModuleSpec
 
 
-from Utils import ENTITY_RE, exceptions, check_proxy, set_console_title
-from Utils import cardinal_tools
-from Utils.types import Plugin, Handler
+from Utils import (
+    ENTITY_RE, exceptions, check_proxy, set_console_title, Plugin, Handler, get_new_releases, CheckUpdatesResponses, CardinalManager, Release, CheckUpdatesResponse,
+    VERSION_PATH
+)
 
 
 from configs import Config
@@ -21,14 +22,12 @@ import FunPayAPI
 from FunPayAPI import types
 from FunPayAPI.types import LotShortcut
 from FunPayAPI.common.enums import EventTypes
-from FunPayAPI import utils as fp_utils
 
 
 import json
 from types import ModuleType
 from typing import Literal, Any, NoReturn
 from pathlib import Path
-from uuid import UUID
 from datetime import datetime
 import logging
 import random
@@ -52,14 +51,14 @@ log = logging.getLogger('C_EXT')
 
 def get_cardinal(name: str = 'Cardinal') -> None | Cardinal:
     '''
-    Возвращает существующий экземпляр кардинала.
+    Возвращает существующий экземпляр Кардинала.
     '''
     return Cardinal.instances.get(name)
 
 
 class Cardinal:
     instances = {}
-    'Список запущенных экземпляров кардинала.'
+    'Список существующих экземпляров Кардинала.'
 
 
     def __new__(cls, name: str, *args, **kwargs):
@@ -82,15 +81,21 @@ class Cardinal:
         self.run_id = 0
 
         self.initiated = False
-        'Флаг инициализации кардинала.'
+        'Флаг инициализации Кардинала.'
 
         self.process_events_loop_running = False
         'Флаг запущенного обработчика событий.'
         self.update_session_loop_running = False
         'Флаг запущенного цикла обновления данных о пользователе.'
+        self.check_cardinal_updates_loop_running = False
+        'Флаг запущенного цикла проверки обновлений Кардинала.'
 
 
         self.start_time = int(time())
+
+
+        self.cardinal_manager: CardinalManager = None
+        'Объект управляющего Кардиналом класса.'
 
 
         if self.config.proxy.enable: self.__init_proxy()
@@ -125,22 +130,22 @@ class Cardinal:
 
 
         self.event_var_names = [
-            'PRE_INIT',
-            'POST_INIT',
-            'PRE_START',
-            'POST_START',
-            'PRE_STOP',
-            'POST_STOP',
-            'INIT_CHAT',
-            'MESSAGES_LIST_CHANGED',
-            'LAST_CHAT_MESSAGE_CHANGED',
-            'NEW_MESSAGE',
-            'INIT_ORDER',
-            'NEW_ORDER',
-            'ORDERS_LIST_CHANGED',
-            'ORDER_STATUS_CHANGED',
-            'PROFILE_UPDATE_SUCCESS',
-            'HANDLER_ERROR'
+            'PRE_INIT', # Функции, выполняемые до инициализации Кардинала (после загрузки плагинов).
+            'POST_INIT', # Функции, выполняемые после инициализации Кардинала.
+            'PRE_START', # Функции, выполняемые перед запуском кардинала (выполняются первыми).
+            'POST_START', # Функции, выполняемые перед запуском кардинала (после PRE_START).
+            'PRE_STOP', # Функции, выполняемые при остановке кардинала (выполняются первыми).
+            'POST_STOP', # Функции, выполняемые при остановке кардинала (после PRE_STOP).
+            'INITIAL_CHAT', # Функции, выполняемые при получении чата при запуске раннера.
+            'CHATS_LIST_CHANGED', # Функции, выполняемые при изменении списка чатов или последнего сообщения любого из чатов.
+            'LAST_CHAT_MESSAGE_CHANGED', # Функции, выполняемые при изменении последнего сообщения в чате.
+            'NEW_MESSAGE', # Функции, выполняемые при получении нового сообщения.
+            'INITIAL_ORDER', # Функции, выполняемые при обнаружении заказа при запуске раннера.
+            'NEW_ORDER', # Функции, выполняемые при получении нового заказа.
+            'ORDERS_LIST_CHANGED', # Функции, выполняемые при изменении списка заказов или их статусов.
+            'ORDER_STATUS_CHANGED', # Функции, выполняемые при изменении статуса заказа.
+            'PROFILE_UPDATE_SUCCESS', # Функции, выполняемые при успешном обновлении профиля.
+            'HANDLER_ERROR' # Функции, выполняемые при ошибке выполнения хендлера (могут вызвать бесконечную рекурсию).
         ]
         'Имена событий для привязки хендлеров.'
 
@@ -151,17 +156,18 @@ class Cardinal:
             'POST_START',
             'PRE_STOP',
             'POST_STOP',
-            'INIT_CHAT',
-            'MESSAGES_LIST_CHANGED',
+            'INITIAL_CHAT',
+            'CHATS_LIST_CHANGED',
             'LAST_CHAT_MESSAGE_CHANGED',
             'NEW_MESSAGE',
-            'INIT_ORDER',
+            'INITIAL_ORDER',
             'NEW_ORDER',
             'ORDERS_LIST_CHANGED',
             'ORDER_STATUS_CHANGED',
             'PROFILE_UPDATE_SUCCESS',
             'HANDLER_ERROR'
         ] | str, list[Handler]] = {}
+        'Список загруженных хендлеров.'
 
 
         self.plugins_load_order: list[str] = []
@@ -210,11 +216,11 @@ class Cardinal:
 
     def init(self):
         '''
-        Инициализирует кардинал.
+        Инициализирует Кардинал.
 
         Загружает плагины, регистрирует хэндлеры, получает данные аккаунта и профиля.
         '''
-        log.info('Инициализирую кардинал.')
+        log.info('Инициализирую Кардинал.')
 
 
         self.get_plugins()
@@ -243,9 +249,9 @@ class Cardinal:
 
     def start(self):
         '''
-        Запускает кардинал.
+        Запускает Кардинал.
         '''
-        log.info('Запускаю кардинал.')
+        log.info('Запускаю Кардинал.')
 
         if not self.initiated: raise Exception('Кардинал должен быть инициализирован перед запуском!') # TODO Custom exception
 
@@ -262,15 +268,17 @@ class Cardinal:
 
         Thread(target=self.update_session_loop, daemon=True).start()
 
+        Thread(target=self.check_cardinal_updates_loop, daemon=True).start()
+
 
         self.process_events()
 
 
     def stop(self):
         '''
-        Останавливает кардинал.
+        Останавливает Кардинал.
         '''
-        log.info(f'Останавливаю кардинал.')
+        log.info(f'Останавливаю Кардинал.')
 
         self.run_handlers(self.handlers.get('PRE_STOP', []))
 
@@ -281,7 +289,7 @@ class Cardinal:
         self.run_handlers(self.handlers.get('POST_STOP', []))
 
 
-    def update_session(self, attempts: int = 3) -> bool:
+    def update_session(self, attempts: int = 3) -> bool: # TODO Raise custom Exception instead of boolean return
         '''
         Обновляет данные аккаунта (баланс, токены и т.д.)
 
@@ -324,7 +332,7 @@ class Cardinal:
         subcategories = self.account.get_sorted_subcategories()[FunPayAPI.enums.SubCategoryTypes.COMMON]
 
 
-        for _ in range(attempts):
+        for _ in range(attempts): # TODO Move attempts to whole function
             subcat_id = random.choice(list(subcategories.keys()))
 
             lots = self.account.get_subcategory_public_lots(FunPayAPI.enums.SubCategoryTypes.COMMON, subcat_id)
@@ -335,7 +343,7 @@ class Cardinal:
         else: raise Exception(...) # TODO
 
 
-        balance = self.account.get_balance(random.choice(lots).id)
+        balance = self.account.get_balance(random.choice(lots).id) # TODO Fix empty lots list
 
         return balance
 
@@ -374,12 +382,12 @@ class Cardinal:
             sleep(2)
 
 
-    def __update_profile(self, infinite_polling: bool = True, attempts: int = 3, update_main_profile: bool = True) -> bool:
+    def __update_profile(self, infinite_polling: bool = True, attempts: int = 3) -> bool: # TODO Raise custom Exception instead of boolean return
         '''
-        :param infinite_polling: бесконечно посылать запросы, пока не будет получен ответ (игнорировать макс. кол-во попыток)
-        :param attempts: максимальное кол-во попыток.
-        :param update_telegram_profile: обновить ли информацию о профиле для TG ПУ?
-        :param update_main_profile: обновить ли информацию о профиле для всего кардинала (+ хэндлеров)?
+        Обновляет профиль FunPay.
+
+        :param infinite_polling: Бесконечно посылать запросы, пока не будет получен ответ (игнорировать макс. кол-во попыток)
+        :param attempts: Максимальное кол-во попыток.
 
         :return: True, если информация обновлена, False, если превышено макс. кол-во попыток.
         '''
@@ -390,7 +398,7 @@ class Cardinal:
 
         while _ or infinite_polling:
             try:
-                profile = self.account.get_user(self.account.id)
+                self.profile = self.account.get_user(self.account.id)
                 break
 
             except TimeoutError: log.error(self.__translate('c_ext_profile_get_timeout_err'))
@@ -416,11 +424,9 @@ class Cardinal:
             return False
 
 
-        if update_main_profile:
-            self.profile = profile
-            self.lot_shortcuts = profile.get_lots()
-            self.lot_ids = [i.id for i in self.lot_shortcuts]
-            log.info(self.__translate('c_ext_profile_updated', len(profile.get_lots()), len(profile.get_sorted_lots(2))))
+        self.lot_shortcuts = self.profile.get_lots()
+        self.lot_ids = [i.id for i in self.lot_shortcuts]
+        log.info(self.__translate('c_ext_profile_updated', len(self.lot_shortcuts), len(self.profile.get_sorted_lots(2))))
 
 
         self.run_handlers(self.handlers.get('PROFILE_UPDATE_SUCCESS', []))
@@ -429,7 +435,7 @@ class Cardinal:
         return True
 
 
-    def process_events(self) -> NoReturn:
+    def process_events(self) -> NoReturn: # TODO Add Worker subclass
         '''
         Запускает хэндлеры, привязанные к тому или иному событию.
         '''
@@ -441,23 +447,13 @@ class Cardinal:
 
 
         event_handlers = {
-            EventTypes.INITIAL_CHAT: 'INIT_CHAT',
-            EventTypes.CHATS_LIST_CHANGED: 'MESSAGES_LIST_CHANGED',
-            EventTypes.LAST_CHAT_MESSAGE_CHANGED: 'LAST_CHAT_MESSAGE_CHANGED',
-            EventTypes.NEW_MESSAGE: 'NEW_MESSAGE',
-            EventTypes.INITIAL_ORDER: 'INIT_ORDER',
-            EventTypes.ORDERS_LIST_CHANGED: 'ORDERS_LIST_CHANGED',
-            EventTypes.NEW_ORDER: 'NEW_ORDER',
-            EventTypes.ORDER_STATUS_CHANGED: 'ORDER_STATUS_CHANGED'
+            event_type: event_type.name for event_type in EventTypes
         }
 
 
-        for event in self.runner.listen(requests_delay=int(self.config.Other.requestsDelay)):
+        for event in self.runner.listen(requests_delay=int(self.config.Other.requestsDelay)): # add stop function to Runner
             if instance_id != self.run_id:
-                log.info('Останавливаю обработчик событий.')
-
                 self.process_events_loop_running = False
-
 
                 break
 
@@ -465,7 +461,7 @@ class Cardinal:
             self.run_handlers(self.handlers.get(event_handlers[event.type], []), event)
 
 
-    def update_session_loop(self) -> NoReturn:
+    def update_session_loop(self) -> NoReturn: # TODO Add Worker subclass
         '''
         Запускает бесконечный цикл обновления данных о пользователе.
         '''
@@ -481,10 +477,7 @@ class Cardinal:
             sleep(1)
 
             if instance_id != self.run_id:
-                log.info(self.__translate('c_ext_session_loop_stopped'))
-
                 self.update_session_loop_running = False
-
 
                 break
 
@@ -501,6 +494,106 @@ class Cardinal:
             next_update_time = int(time()) + 3600
 
 
+    def check_cardinal_updates_loop(self) -> NoReturn: # TODO Add Worker subclass
+        '''
+        Запускает бесконечный цикл проверки обновлений Кардинала. Автоматически обновляет и перезапускает Кардинал, если включены соответствующие настройки.
+        '''
+        log.info(self.__translate('c_ext_starting_check_cardinal_updates_loop'))
+
+        instance_id = self.run_id
+
+        self.check_cardinal_updates_loop_running = True
+
+        next_check_time = int(time())
+
+        while True:
+            sleep(1)
+
+            if instance_id != self.run_id:
+                self.check_cardinal_updates_loop_running = False
+
+                break
+
+
+            if not self.config.check_for_updates: continue
+
+
+            if next_check_time > int(time()): continue
+
+
+            result = self.check_updates()
+
+            if result.response is CheckUpdatesResponses.CARDINAL_IS_UP_TO_DATE:
+                log.info(f'{result.response.value}.')
+
+                next_check_time = int(time()) + self.config.check_for_updates_delay
+
+                continue
+
+
+            if result.response is CheckUpdatesResponses.UPDATE_AVAILABLE:
+                if not self.config.auto_update:
+                    for release in result.releases:
+                        log.info(f'Доступна новая версия: {release.sources_link}.')
+
+                        next_check_time = int(time()) + self.config.check_for_updates_delay
+
+                        continue
+
+
+                self.update(result.releases[-1])
+
+
+                next_check_time = int(time()) + self.config.check_for_updates_delay
+
+                continue
+
+
+            log.warning(f'Ошибка при проверке обновлений: {result.response.value}')
+
+            next_check_time = int(time()) + 60
+
+            continue
+
+
+    def check_updates(self) -> CheckUpdatesResponse:
+        log.debug('Проверяю наличие обновлений.')
+
+        result = get_new_releases(self.__cardinal_package_version)
+
+
+        return result
+    
+
+    def update(self, release: Release) -> None:
+        '''
+        Обновляет и полностью перезапускает Кардинал.
+
+        :param release: Информация об обновлении.
+        :type release: Release
+        '''
+        log.info(f'Начинаю установку обновления.')
+
+        try:
+            if not getattr(self, 'cardinal_manager', None): raise KeyError('Отсутствует CardinalManager')
+
+            self.cardinal_manager.create_cardinal_backup(self.name)
+
+
+            self.cardinal_manager.update_cardinal(release)
+
+
+            self.cardinal_manager.restart_cardinal(self.name)
+
+
+        except:
+            log.error('Не удалось установить обновление.')
+            log.debug('TRACEBACK', exc_info=True)
+
+
+        return
+
+
     # ---------------------------------------------------------------------------- #
     #                                    Плагины                                   #
     # ---------------------------------------------------------------------------- #
@@ -514,11 +607,10 @@ class Cardinal:
         plugin_dirs = (Path(__file__).parent / 'plugins').iterdir()
 
         for plugin_dir in plugin_dirs:
-            plugin_path = plugin_dir / 'plugin.py'
             # ---------- Если нет plugin_info.json или plugin.py - это не плагин --------- #
-            if any([
-                not plugin_path.exists(),
-                not (plugin_dir / 'plugin_info.json').exists()
+            if not all([
+                (plugin_dir / 'plugin.py').exists(),
+                (plugin_dir / 'plugin_info.json').exists()
             ]): continue
 
             plugin_uuid, plugin_raw_info = self.get_plugin_raw_info(plugin_dir)
@@ -813,7 +905,7 @@ class Cardinal:
 
     def add_handlers_from_plugin(self, plugin: Plugin):
         '''
-        Добавляет хендлеры из плагина в кардинал.
+        Добавляет хендлеры из плагина в Кардинал.
 
         :param plugin: Плагин.
         :type plugin: Plugin
@@ -827,7 +919,7 @@ class Cardinal:
 
     def add_handler(self, handler: Handler, event_var_name: str):
         '''
-        Добавляет хендлер в кардинал.
+        Добавляет хендлер в Кардинал.
 
         :param handler: Хендлер.
         :type handler: Handler
@@ -1015,6 +1107,16 @@ class Cardinal:
     # ---------------------------------------------------------------------------- #
     @property
     def config(self): return Config(self.name)
+
+
+    @property
+    def __cardinal_package_version(self) -> str:
+        'Текущая версия программы.'
+        with open(VERSION_PATH, 'r') as fp:
+            result = fp.read()
+
+
+        return result
 
 
     # ---------------------------------------------------------------------------- #

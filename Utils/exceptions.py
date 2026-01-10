@@ -6,16 +6,22 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from . import Plugin
     from pathlib import Path
+    from requests import Response
 
 
 __all__ = [
     'ProxyCheckError',
     'ModuleImportError',
     'PluginNotTrustedException',
-    'PluginDependenciesNotLoadedError'
+    'PluginDependenciesNotLoadedError',
+    'GitHubRequestError',
+    'BackupNotFoundError'
 ]
 
 
+# ---------------------------------------------------------------------------- #
+#                                    Прокси                                    #
+# ---------------------------------------------------------------------------- #
 class ProxyCheckError(Exception):
     def __init__(self, proxies: dict[str, str]):
         '''
@@ -76,3 +82,30 @@ class PluginDependenciesNotLoadedError(Exception):
         self.dependencies = dependencies
 
     def __str__(self): return f'Загружены не все зависимости плагина {self.plugin.name} {self.plugin.uuid}: {[*self.dependencies]}'
+
+
+# ---------------------------------------------------------------------------- #
+#                                    Updater                                   #
+# ---------------------------------------------------------------------------- #
+class GitHubRequestError(Exception):
+    def __init__(self, response: Response):
+        '''
+        Исключение, поднимающееся, если при запросе к репозиторию GitHub возникла ошибка.
+
+        :param response: Ответ запроса.
+        :type response: Response
+        '''
+        self.response = response
+
+
+    def __str__(self): return f'Ошибка при запросе к GitHub {self.response.url} (Код ответа: {self.response.status_code})'
+
+
+class BackupNotFoundError(Exception):
+    def __init__(self):
+        '''
+        Исключение, поднимающееся, если не найден распакованный бекап.
+        '''
+
+
+    def __str__(self): return 'Бекап не найден'

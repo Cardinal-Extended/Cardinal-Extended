@@ -1,13 +1,15 @@
 
 configs/settings.toml
 
+plugins
+logs
+storage
+
+backup.zip
+
+
 env
 pyenv
-
-
-plugins
-
-logs
 
 
 __pycache__

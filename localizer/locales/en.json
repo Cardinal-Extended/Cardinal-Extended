@@ -21,7 +21,8 @@
     "c_ext_session_unexpected_err": "An unexpected error occurred while refreshing the session.",
     "c_ext_session_no_more_attempts_err": "Failed to refresh session: the number of attempts was exceeded.",
     "c_ext_starting_session_loop": "$CYANThe session refresh loop is starting.",
-    "c_ext_stopping_session_loop": "$BLUEThe session refresh loop is stopping.",
+
+    "c_ext_starting_check_cardinal_updates_loop": "$CYANThe Cardinal updates check loop is starting (this does not mean that auto-check for updates is enabled).",
 
 
     "c_ext_msg_sent": "Sent a message to the chat $YELLOW{}.",
