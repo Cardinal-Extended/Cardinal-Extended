@@ -1,12 +1,18 @@
 {
+    "c_ext_initializing_cardinal": "Инициализирую Кардинал.",
+    "c_ext_starting_cardinal": "Запускаю Кардинал.",
+    "c_ext_stopping_cardinal": "Останавливаю Кардинал.",
+
+
+    "c_ext_getting_acc": "Получаю данные об аккаунте.",
+    "c_ext_acc_get_timeout_err": "Не удалось загрузить данные об аккаунте: превышен тайм-аут ожидания.",
+    "c_ext_acc_get_unexpected_err": "Произошла непредвиденная ошибка при получении данных аккаунта.",
+
+
     "c_ext_proxy_detected": "Обнаружен прокси.",
     "c_ext_checking_proxy": "Выполняю проверку прокси.",
     "c_ext_proxy_err": "Не удалось подключиться к прокси. Убедитесь, что данные введены верно.",
     "c_ext_proxy_success": "Прокси успешно проверен! IP-адрес: $YELLOW{}$RESET.",
-
-
-    "c_ext_acc_get_timeout_err": "Не удалось загрузить данные об аккаунте: превышен тайм-аут ожидания.",
-    "c_ext_acc_get_unexpected_err": "Произошла непредвиденная ошибка при получении данных аккаунта.",
 
 
     "c_ext_getting_profile_data": "Получаю данные о лотах и категориях.",
@@ -16,19 +22,79 @@
     "c_ext_profile_updated": "Обновил информацию о лотах $YELLOW({})$RESET и категориях $YELLOW({})$RESET профиля.",
 
 
+    "c_ext_getting_balance": "Получаю баланс.",
+
+
+    "c_ext_getting_plugins": "Получаю плагины.",
+    "c_ext_getting_plugins_success": "Плагины ({}) успешно получены.",
+
+
+    "c_ext_getting_plugin_raw_info": "Получаю информацию о плагине {}.",
+
+
+    "c_ext_loading_plugins": "Загружаю плагины.",
+    "c_ext_loading_plugin": "Загружаю плагин {} ({}).",
+    "c_ext_plugin_is_not_trusted_err": "Плагин {} не будет загружен, так как отсутствует в trusted_plugins.",
+    "c_ext_plugin_dependencies_not_loaded_err": "Плагин {} не будет загружен, так как загружены не все его зависимости.",
+    "c_ext_plugin_load_error": "Не удалось загрузить плагин {}.",
+    "c_ext_plugin_load_success": "Плагин {} ({}) успешно загружен.",
+    "c_ext_loading_plugins_success": "Плагины ({}) успешно загружены.",
+
+
+    "c_ext_getting_plugins_load_order": "Получаю порядок загрузки плагинов.",
+    "c_ext_getting_plugins_load_order_success": "Порядок загрузки плагинов успешно получен: {}",
+
+
+    "c_ext_initializing_plugins": "Инициализирую плагины ({}).",
+    "c_ext_initializing_plugin": "Инициализирую плагин {} ({}).",
+    "c_ext_getting_plugin_handlers": "Получаю хендлеры {}: {} ({}).",
+    "c_ext_initializing_plugin_err": "Ошибка при инициализации плагина {} ({}).",
+    "c_ext_initializing_plugins_success": "Все плагины инициализированы.",
+
+
+    "c_ext_adding_plugins_handlers": "Загружаю хендлеры из плагинов ({}).",
+    "c_ext_adding_plugin_handlers": "Загружаю хендлеры из плагина {} ({}).",
+    "c_ext_adding_event_handlers": "Добавляю хендлеры {}: {} ({}).",
+    "c_ext_adding_handler": "Добавляю хендлер {} ({}) в хендлеры {}.",
+
+
+    "c_ext_running_load_plugin_handlers": "Запускаю хендлеры при загрузке плагина {} ({}).",
+    "c_ext_running_init_plugin_handlers": "Запускаю хендлеры при инициализации плагина {} ({}).",
+    "c_ext_running_handlers": "Запускаю хендлеры {}. \nargs={} \nkwargs={}",
+    "c_ext_running_handler": "Запускаю хендлер {}. \nargs={} \nkwargs={}",
+    "c_ext_running_handler_err": "Ошибка при выполнении хендлера {}.",
+
+
+    "c_ext_updating_session": "Обновляю сессию.",
     "c_ext_session_updated": "Сессия обновлена.",
     "c_ext_session_timeout_err": "Не удалось обновить сессию: превышен тайм-аут ожидания.",
     "c_ext_session_unexpected_err": "Произошла непредвиденная ошибка при обновлении сессии.",
     "c_ext_session_no_more_attempts_err": "Не удалось обновить сессию: превышено кол-во попыток.",
     "c_ext_starting_session_loop": "$CYANЗапускаю цикл обновления сессии.",
 
+
+    "c_ext_starting_process_events_loop": "Запускаю обработчик событий.",
+
+
     "c_ext_starting_check_cardinal_updates_loop": "$CYANЗапускаю цикл проверки обновлений Кардинала (это не значит, что автопроверка обновлений включена).",
+
+
+    "c_ext_checking_updates": "Проверяю наличие обновлений.",
+    "c_ext_new_version_available": "Доступна новая версия: {}.",
+    "c_ext_check_updates_error": "Ошибка при проверке обновлений: {}",
+
+
+    "c_ext_starting_update": "Начинаю установку обновления.",
+    "c_ext_update_error": "Не удалось установить обновление.",
 
 
     "c_ext_msg_sent": "Отправил сообщение в чат $YELLOW{}.",
     "c_ext_msg_send_err": "Произошла ошибка при отправке сообщения в чат $YELLOW{}$RESET.",
     "c_ext_msg_attempts_left": "Осталось попыток: $YELLOW{}$RESET.",
     "c_ext_msg_no_more_attempts_err": "Не удалось отправить сообщение в чат $YELLOW{}$RESET: превышено кол-во попыток.",
+
+
+    "c_ext_getting_exchange_rate_err": "Не удалось получить курс обмена. Осталось попыток: {}.",
 
 
     "c_ext_try_again_in_n_secs": "Повторю попытку через {} секунд(-у/-ы).",

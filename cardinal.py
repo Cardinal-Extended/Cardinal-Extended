@@ -220,7 +220,7 @@ class Cardinal:
 
         Загружает плагины, регистрирует хэндлеры, получает данные аккаунта и профиля.
         '''
-        log.info('Инициализирую Кардинал.')
+        log.info(self.__translate('c_ext_initializing_cardinal'))
 
 
         self.get_plugins()
@@ -251,7 +251,7 @@ class Cardinal:
         '''
         Запускает Кардинал.
         '''
-        log.info('Запускаю Кардинал.')
+        log.info(self.__translate('c_ext_starting_cardinal'))
 
         if not self.initiated: raise Exception('Кардинал должен быть инициализирован перед запуском!') # TODO Custom exception
 
@@ -278,7 +278,7 @@ class Cardinal:
         '''
         Останавливает Кардинал.
         '''
-        log.info(f'Останавливаю Кардинал.')
+        log.info(self.__translate('c_ext_stopping_cardinal'))
 
         self.run_handlers(self.handlers.get('PRE_STOP', []))
 
@@ -297,7 +297,7 @@ class Cardinal:
 
         :return: True, если удалось обновить данные, False - если нет.
         '''
-        log.info('Обновляю сессию.')
+        log.info(self.__translate('c_ext_updating_session'))
 
         for _ in range(attempts):
             try:
@@ -308,7 +308,7 @@ class Cardinal:
 
             except TimeoutError: log.warning(self.__translate('c_ext_session_timeout_err'))
 
-            except (FunPayAPI.exceptions.UnauthorizedError, FunPayAPI.exceptions.RequestFailedError) as e:
+            except (FunPayAPI.exceptions.UnauthorizedError, FunPayAPI.exceptions.RequestFailedError) as e: # TODO
                 log.error(e.short_str)
                 log.debug(e)
 
@@ -327,7 +327,7 @@ class Cardinal:
 
 
     def get_balance(self, attempts: int = 3) -> FunPayAPI.types.Balance:
-        log.info('Получаю баланс.')
+        log.info(self.__translate('c_ext_getting_balance'))
 
         subcategories = self.account.get_sorted_subcategories()[FunPayAPI.enums.SubCategoryTypes.COMMON]
 
@@ -349,7 +349,7 @@ class Cardinal:
 
 
     def __init_account(self) -> None:
-        log.info(f'Получаю данные об аккаунте.')
+        log.info(self.__translate('c_ext_getting_acc'))
 
         while True:
             try:
@@ -368,7 +368,7 @@ class Cardinal:
 
             except TimeoutError: log.error(self.__translate('c_ext_acc_get_timeout_err'))
 
-            except (FunPayAPI.exceptions.UnauthorizedError, FunPayAPI.exceptions.RequestFailedError) as e:
+            except (FunPayAPI.exceptions.UnauthorizedError, FunPayAPI.exceptions.RequestFailedError) as e: # TODO
                 log.error(e.short_str())
                 log.debug(f'TRACEBACK {e.short_str()}')
 
@@ -439,7 +439,7 @@ class Cardinal:
         '''
         Запускает хэндлеры, привязанные к тому или иному событию.
         '''
-        log.info('Запускаю обработчик событий.')
+        log.info('c_ext_starting_process_events_loop')
 
         self.process_events_loop_running = True
 
@@ -534,7 +534,7 @@ class Cardinal:
             if result.response is CheckUpdatesResponses.UPDATE_AVAILABLE:
                 if not self.config.auto_update:
                     for release in result.releases:
-                        log.info(f'Доступна новая версия: {release.sources_link}.')
+                        log.info(self.__translate('c_ext_new_version_available', release.sources_link))
 
                         next_check_time = int(time()) + self.config.check_for_updates_delay
 
@@ -549,7 +549,7 @@ class Cardinal:
                 continue
 
 
-            log.warning(f'Ошибка при проверке обновлений: {result.response.value}')
+            log.warning(self.__translate('c_ext_check_updates_error', result.response.value))
 
             next_check_time = int(time()) + 60
 
@@ -557,7 +557,7 @@ class Cardinal:
 
 
     def check_updates(self) -> CheckUpdatesResponse:
-        log.debug('Проверяю наличие обновлений.')
+        log.debug(self.__translate('c_ext_checking_updates'))
 
         result = get_new_releases(self.__cardinal_package_version)
 
@@ -572,7 +572,7 @@ class Cardinal:
         :param release: Информация об обновлении.
         :type release: Release
         '''
-        log.info(f'Начинаю установку обновления.')
+        log.info(self.__translate('c_ext_starting_update'))
 
         try:
             if not getattr(self, 'cardinal_manager', None): raise KeyError('Отсутствует CardinalManager')
@@ -587,7 +587,7 @@ class Cardinal:
 
 
         except:
-            log.error('Не удалось установить обновление.')
+            log.error(self.__translate('c_ext_update_error'))
             log.debug('TRACEBACK', exc_info=True)
 
 
@@ -601,7 +601,7 @@ class Cardinal:
     # ----------------------------- Загрузка плагинов ---------------------------- #
     def get_plugins(self) -> None:
         'Получает все плагины из папки plugins. Не импортирует модули.'
-        log.debug('Получаю плагины.')
+        log.debug(self.__translate('c_ext_getting_plugins'))
 
         plugins_count = 0
         plugin_dirs = (Path(__file__).parent / 'plugins').iterdir()
@@ -629,7 +629,7 @@ class Cardinal:
             self.plugins[plugin.uuid] = plugin
             plugins_count+=1
 
-        log.debug(f'Плагины ({plugins_count}) успешно получены.')
+        log.debug(self.__translate('c_ext_getting_plugins_success', plugins_count))
 
         return
 
@@ -644,7 +644,7 @@ class Cardinal:
         :return: Информация о плагине.
         :rtype: dict[str, Any]
         '''
-        log.debug(f'Получаю информацию о плагине "{plugin_dir}".')
+        log.debug(f'c_ext_getting_plugin_raw_info', plugin_dir)
 
         plugin_info_path = plugin_dir / 'plugin_info.json'
         plugin_dependencies_path = plugin_dir / 'dependencies.json'
@@ -666,7 +666,7 @@ class Cardinal:
 
     def load_plugins(self) -> None:
         'Загружает плагины, полученные через get_plugins.'
-        log.debug('Загружаю плагины.')
+        log.debug(self.__translate('c_ext_loading_plugins'))
 
         plugins_raw_info = {plugin.uuid: plugin.raw_info for plugin in self.plugins.values()}
 
@@ -683,18 +683,18 @@ class Cardinal:
                 plugins_count+=1
 
             except exceptions.PluginNotTrustedException:
-                log.warning(f'Плагин {plugin_uuid} не будет загружен, так как отсутствует в trusted_plugins')
+                log.warning(self.__translate('c_ext_plugin_is_not_trusted_err', plugin_uuid))
 
             except exceptions.PluginDependenciesNotLoadedError:
-                log.error(f'Плагин {plugin_uuid} не будет загружен, так загружены не все его зависимости.')
+                log.error(self.__translate('c_ext_plugin_dependencies_not_loaded_err', plugin_uuid))
                 log.debug('TRACEBACK', exc_info=True)
 
             except:
-                log.error(f'Не удалось загрузить плагин {plugin_uuid}.')
+                log.error(self.__translate('c_ext_plugin_load_error', plugin_uuid))
                 log.debug('TRACEBACK', exc_info=True)
 
 
-        log.debug(f'Плагины ({plugins_count}) успешно загружены.')
+        log.debug(self.__translate('c_ext_loading_plugins_success', plugins_count))
 
         return
 
@@ -709,15 +709,11 @@ class Cardinal:
         :return: Список плагинов с порядком загрузки.
         :rtype: dict
         '''
-        log.debug(f'Присваиваю {len(plugins_raw_info)} плагинам(-у) порядок загрузки.')
-
         result = plugins_raw_info.copy()
 
         for plugin_uuid in plugins_raw_info:
             result = Cardinal.set_plugin_load_order(plugin_uuid, result)
 
-
-        log.debug(f'Успешно присвоил порядок загрузки {len(plugins_raw_info)} плагинам(-у).')
 
         return result
 
@@ -771,8 +767,6 @@ class Cardinal:
         :return: Модуль.
         :rtype: tuple[ModuleSpec, ModuleType]
         '''
-        log.debug(f'Загружаю модуль "{module_path.stem}" ({module_path}).')
-
         try:
             spec = importlib.util.spec_from_file_location(module_path.stem, module_path)
             module = importlib.util.module_from_spec(spec)
@@ -780,7 +774,6 @@ class Cardinal:
         except: raise exceptions.ModuleImportError(module_path)
 
 
-        log.debug(f'Модуль "{module.__name__}" ({module_path}) успешно загружен.')
         return spec, module
 
 
@@ -791,13 +784,13 @@ class Cardinal:
         :param plugins_raw_info: Информация о плагинах.
         :type plugins_raw_info: dict
         '''
-        log.debug(f'Получаю порядок загрузки плагинов.')
+        log.debug(self.__translate('c_ext_getting_plugins_load_order'))
 
         self.plugins_load_order = list(plugins_raw_info)
 
         self.plugins_load_order.sort(key=lambda u: plugins_raw_info[u]['load_order'])
 
-        log.debug(f'Порядок загрузки плагинов успешно получен: {self.plugins_load_order}')
+        log.debug(self.__translate('c_ext_getting_plugins_load_order_success', self.plugins_load_order))
 
 
     def load_plugin(self, plugin_uuid: str):
@@ -814,7 +807,7 @@ class Cardinal:
         plugin = self.plugins[plugin_uuid]
 
 
-        log.debug(f'Загружаю плагин {plugin.name} ({plugin.uuid}).')
+        log.debug(self.__translate('c_ext_loading_plugin', plugin.name, plugin.uuid))
 
         if all([
             not self.config.plugins.load_all_plugins,
@@ -831,29 +824,29 @@ class Cardinal:
 
 
         if hasattr(plugin.module, 'LOAD_PLUGIN'):
-            log.debug(f'Запускаю хендлеры при загрузке плагина {plugin.name} ({plugin.uuid}).')
+            log.debug(self.__translate('c_ext_running_load_plugin_handlers', plugin.name, plugin.uuid))
 
             init_plugin_handlers = [Handler(plugin.uuid, 'LOAD_PLUGIN', 0, func) for func in getattr(plugin.module, 'LOAD_PLUGIN')]
 
             self.run_handlers(init_plugin_handlers)
 
 
-        log.debug(f'Плагин {plugin.name} ({plugin.uuid}) успешно загружен.')
+        log.debug(self.__translate('c_ext_plugin_load_success', plugin.name, plugin.uuid))
 
         return
 
 
     def init_plugins(self):
         'Инициализирует все загруженные плагины.'
-        log.debug(f'Инициализирую плагины ({len(self.plugins)}).')
+        log.debug(self.__translate('c_ext_initializing_plugins', len(self.plugins)))
 
         for plugin in self.plugins.values():
             try: self.init_plugin(plugin, self.event_var_names)
             except:
-                log.error(f'Ошибка при инициализации плагина {plugin.name} ({plugin.uuid}).')
+                log.error(self.__translate('c_ext_initializing_plugin_err', plugin.name, plugin.uuid))
                 log.debug('TRACEBACK', exc_info=True)
 
-        log.info('Все плагины инициализированы.')
+        log.info(self.__translate('c_ext_initializing_plugins_success'))
 
 
     def init_plugin(self, plugin: Plugin, event_var_names: list[str]):
@@ -865,11 +858,11 @@ class Cardinal:
         :param event_var_names: Список алиасов хендлеров.
         :type event_var_names: list[str]
         '''
-        log.debug(f'Инициализирую плагин {plugin.name} ({plugin.uuid}).')
+        log.debug(self.__translate('c_ext_initializing_plugin', plugin.name, plugin.uuid))
 
 
         if hasattr(plugin.module, 'INIT_PLUGIN'):
-            log.debug(f'Запускаю хендлеры при инициализации плагина {plugin.name} ({plugin.uuid}).')
+            log.debug(self.__translate('c_ext_running_init_plugin_handlers', plugin.name, plugin.uuid))
             init_plugin_handlers = [
                 Handler(
                     plugin.uuid,
@@ -883,7 +876,7 @@ class Cardinal:
 
         for event_name in event_var_names:
             if hasattr(plugin.module, event_name):
-                log.debug(f'Получаю хендлеры {event_name}: {getattr(plugin.module, event_name)} ({plugin.uuid}).')
+                log.debug(self.__translate('c_ext_getting_plugin_handlers', event_name, getattr(plugin.module, event_name), plugin.uuid))
 
                 for handler_value in getattr(plugin.module, event_name):
                     handler = Handler(
@@ -898,7 +891,7 @@ class Cardinal:
 
     def add_handlers_from_plugins(self):
         'Добавляет хендлеры из всех загруженных плагинов.'
-        log.debug(f'Загружаю хендлеры из плагинов ({len(self.plugins)}).')
+        log.debug(self.__translate('c_ext_adding_plugins_handlers', len(self.plugins)))
 
         for plugin in self.plugins.values(): self.add_handlers_from_plugin(plugin)
 
@@ -910,10 +903,10 @@ class Cardinal:
         :param plugin: Плагин.
         :type plugin: Plugin
         '''
-        log.debug(f'Загружаю хендлеры из плагина {plugin.name} ({plugin.uuid}).')
+        log.debug(self.__translate('c_ext_adding_plugin_handlers', plugin.name, plugin.uuid))
 
         for event_name, handlers in plugin.handlers.items():
-            log.debug(f'Добавляю хендлеры {event_name}: {handlers} ({plugin.uuid}).')
+            log.debug(self.__translate('c_ext_adding_event_handlers', event_name, handlers, plugin.uuid))
             for handler in handlers: self.add_handler(handler, event_name)
 
 
@@ -926,7 +919,7 @@ class Cardinal:
         :param event_var_name: Алиас события хендлера.
         :type event_var_name: str
         '''
-        log.debug(f'Добавляю хендлер {handler.func.__name__} ({handler.plugin_uuid}) в хендлеры {event_var_name}.')
+        log.debug(self.__translate('c_ext_adding_handler', handler.func.__name__, handler.plugin_uuid, event_var_name))
 
         self.handlers[event_var_name] = [*self.handlers.get(event_var_name, []), handler]
 
@@ -941,7 +934,7 @@ class Cardinal:
         handlers.sort(key=lambda h: h.priority if h.priority >= 0 else inf)
 
 
-        log.debug(f'Запускаю хендлеры {handlers}. \nargs={args} \nkwargs={kwargs}')
+        log.debug(self.__translate('c_ext_running_handlers', handlers, args, kwargs))
 
         for handler in handlers: self.run_handler(handler, *args, **kwargs)
 
@@ -953,12 +946,12 @@ class Cardinal:
         :param handler: Хендлер.
         :type handler: Handler
         '''
-        log.debug(f'Запускаю хендлер {getattr(handler.func, __name__, handler.plugin_uuid)}. \nargs={args} \nkwargs={kwargs}')
+        log.debug(self.__translate('c_ext_running_handler', getattr(handler.func, __name__, handler.plugin_uuid), args, kwargs))
 
         try: handler.func(self, *args, **kwargs)
 
         except:
-            log.warning(f'Ошибка при выполнении хендлера {getattr(handler.func, __name__, handler.plugin_uuid)}.')
+            log.warning(self.__translate('c_ext_running_handler_err', getattr(handler.func, __name__, handler.plugin_uuid)))
             log.debug(f'args={args} \nkwargs={kwargs}')
             log.debug('TRACEBACK', exc_info=True)
 
@@ -1052,7 +1045,7 @@ class Cardinal:
         return result
 
 
-    def get_exchange_rate(self, base_currency: types.Currency, target_currency: types.Currency, min_interval: int = 60):
+    def get_exchange_rate(self, base_currency: types.Currency, target_currency: types.Currency, min_interval: int = 60): # TODO
         '''
         Получает курс обмена между двумя указанными валютами.
         Если с последней проверки прошло меньше `min_interval` секунд, используется сохранённое значение.
@@ -1095,7 +1088,7 @@ class Cardinal:
 
                 return result
             except:
-                log.warning('Не удалось получить курс обмена. Осталось попыток: {i}')
+                log.warning(self.__translate('c_ext_getting_exchange_rate_err', i))
                 log.debug('TRACEBACK', exc_info=True)
                 sleep(1)
 

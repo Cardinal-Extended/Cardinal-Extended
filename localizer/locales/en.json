@@ -1,12 +1,18 @@
 {
+    "c_ext_initializing_cardinal": "Initializing Cardinal",
+    "c_ext_starting_cardinal": "Starting Cardinal",
+    "c_ext_stopping_cardinal": "Stopping Cardinal",
+
+
+    "c_ext_getting_acc": "Getting account data.",
+    "c_ext_acc_get_timeout_err": "Failed to load account data: Timeout exceeded.",
+    "c_ext_acc_get_unexpected_err": "An unexpected error occurred while retrieving account information.",
+
+
     "c_ext_proxy_detected": "Proxy detected.",
     "c_ext_checking_proxy": "Running proxy checks.",
     "c_ext_proxy_err": "Failed to connect to the proxy. Make sure that the data is entered correctly.",
     "c_ext_proxy_success": "Proxy verified successfully! IP address: $YELLOW{}$RESET.",
-
-
-    "c_ext_acc_get_timeout_err": "Failed to load account data: Timeout exceeded.",
-    "c_ext_acc_get_unexpected_err": "An unexpected error occurred while retrieving account information.",
 
 
     "c_ext_getting_profile_data": "Getting lots and categories data.",
@@ -16,19 +22,79 @@
     "c_ext_profile_updated": "Updated the information about profile lots $YELLOW({})$RESET and categories $YELLOW({})$RESET.",
 
 
+    "c_ext_getting_balance": "Getting balance.",
+
+
+    "c_ext_getting_plugins": "Receiving plugins info.",
+    "c_ext_getting_plugins_success": "Plugins ({}) info received successfully.",
+
+
+    "c_ext_getting_plugin_raw_info": "Receiving plugin {} raw data.",
+
+
+    "c_ext_loading_plugins": "Loading plugins.",
+    "c_ext_loading_plugin": "Loading plugin {} ({}).",
+    "c_ext_plugin_is_not_trusted_err": "Plugin {} will not be loaded because it is not listed in trusted_plugins.",
+    "c_ext_plugin_dependencies_not_loaded_err": "Plugin {} will not be loaded because not all its dependencies are loaded.",
+    "c_ext_plugin_load_error": "An error occurred while loading plugin {}.",
+    "c_ext_plugin_load_success": "Plugin {} ({}) loaded successfully.",
+    "c_ext_loading_plugins_success": "Plugins ({}) are loaded successfully.",
+
+
+    "c_ext_getting_plugins_load_order": "Receiving plugins load order.",
+    "c_ext_getting_plugins_load_order_success": "Plugins load order received successfully: {}",
+
+
+    "c_ext_initializing_plugins": "Initializing plugins ({}).",
+    "c_ext_initializing_plugin": "Initializing plugin {} ({}).",
+    "c_ext_getting_plugin_handlers": "Receiving handlers {}: {} ({}).",
+    "c_ext_initializing_plugin_err": "An error occurred during initialization of plugin {} ({}).",
+    "c_ext_initializing_plugins_success": "All plugins are initializated successfully.",
+
+
+    "c_ext_adding_plugins_handlers": "Adding handlers from plugins ({}).",
+    "c_ext_adding_plugin_handlers": "Adding handlers from plugin {} ({}).",
+    "c_ext_adding_event_handlers": "Adding handlers {}: {} ({}).",
+    "c_ext_adding_handler": "Adding handler {} ({}) into {} list.",
+
+
+    "c_ext_running_load_plugin_handlers": "Running handler on loading of plugin {} ({}).",
+    "c_ext_running_init_plugin_handlers": "Running handlers on initialization if plugin {} ({}).",
+    "c_ext_running_handlers": "Running handlers {}. \nargs={} \nkwargs={}",
+    "c_ext_running_handler": "Running handler {}. \nargs={} \nkwargs={}",
+    "c_ext_running_handler_err": "An error occurred while running handler {}.",
+
+
+    "c_ext_updating_session": "Updating session.",
     "c_ext_session_updated": "Session updated.",
     "c_ext_session_timeout_err": "Failed to refresh session: timeout exceeded.",
     "c_ext_session_unexpected_err": "An unexpected error occurred while refreshing the session.",
     "c_ext_session_no_more_attempts_err": "Failed to refresh session: the number of attempts was exceeded.",
     "c_ext_starting_session_loop": "$CYANThe session refresh loop is starting.",
 
+
+    "c_ext_starting_process_events_loop": "Starting the event listener.",
+
+
     "c_ext_starting_check_cardinal_updates_loop": "$CYANThe Cardinal updates check loop is starting (this does not mean that auto-check for updates is enabled).",
+
+
+    "c_ext_checking_updates": "Checking for updates.",
+    "c_ext_new_version_available": "New version is available: {}.",
+    "c_ext_check_updates_error": "An error occurred when checking for updates: {}",
+
+
+    "c_ext_starting_update": "Updating Cardinal.",
+    "c_ext_update_error": "An error occurred during update.",
 
 
     "c_ext_msg_sent": "Sent a message to the chat $YELLOW{}.",
     "c_ext_msg_send_err": "An error occurred when sending a message to chat $YELLOW{}$RESET.",
     "c_ext_msg_attempts_left": "Attempts left: $YELLOW{}$RESET.",
     "c_ext_msg_no_more_attempts_err": "Failed to send a message to chat $YELLOW{}$RESET: the number of attempts exceeded.",
+
+
+    "c_ext_getting_exchange_rate_err": "Couldn't get the exchange rate. Attempts left: {}.",
 
 
     "c_ext_try_again_in_n_secs": "The next attempt is in {} seconds(-s).",

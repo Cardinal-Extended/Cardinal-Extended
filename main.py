@@ -18,7 +18,7 @@ import colorama
 import time
 
 
-Utils.cardinal_tools.set_console_title(f'Cardinal Extended v{VERSION}')
+Utils.cardinal_tools.set_console_title(f'Cardinal Extended {VERSION}')
 
 
 if getattr(sys, 'frozen', False): os.chdir(os.path.dirname(sys.executable))
