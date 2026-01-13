@@ -18,10 +18,11 @@ from Utils import (
 from configs import Config
 
 
+from FunPayAPI.common import EventTypes, SubCategoryTypes, Currencies # TODO FunPayAPI.__init__.py
+
+
 import FunPayAPI
-from FunPayAPI import types
 from FunPayAPI.types import LotShortcut
-from FunPayAPI.common.enums import EventTypes
 
 
 import json
@@ -329,13 +330,13 @@ class Cardinal:
     def get_balance(self, attempts: int = 3) -> FunPayAPI.types.Balance:
         log.info(self.__translate('c_ext_getting_balance'))
 
-        subcategories = self.account.get_sorted_subcategories()[FunPayAPI.enums.SubCategoryTypes.COMMON]
+        subcategories = self.account.get_sorted_subcategories()[SubCategoryTypes.COMMON]
 
 
         for _ in range(attempts): # TODO Move attempts to whole function
             subcat_id = random.choice(list(subcategories.keys()))
 
-            lots = self.account.get_subcategory_public_lots(FunPayAPI.enums.SubCategoryTypes.COMMON, subcat_id)
+            lots = self.account.get_subcategory_public_lots(SubCategoryTypes.COMMON, subcat_id)
 
 
             if lots: break
@@ -1045,16 +1046,16 @@ class Cardinal:
         return result
 
 
-    def get_exchange_rate(self, base_currency: types.Currency, target_currency: types.Currency, min_interval: int = 60): # TODO
+    def get_exchange_rate(self, base_currency: Currencies, target_currency: Currencies, min_interval: int = 60): # TODO
         '''
         Получает курс обмена между двумя указанными валютами.
         Если с последней проверки прошло меньше `min_interval` секунд, используется сохранённое значение.
 
         :param base_currency: Исходная валюта, из которой производится обмен.
-        :type base_currency: :obj:`types.Currency`
+        :type base_currency: Currencies
 
         :param target_currency: Целевая валюта, в которую производится обмен.
-        :type target_currency: :obj:`types.Currency`
+        :type target_currency: Currencies
 
         :param min_interval: Минимальное время в секундах между проверками курса обмена.
         :type min_interval: :obj:`int`
@@ -1062,7 +1063,7 @@ class Cardinal:
         :return: Коэффициент обмена, где 1 единица `base_currency` = X единиц `target_currency`.
         :rtype: :obj:`float`
         '''
-        assert base_currency != types.Currency.UNKNOWN and target_currency != types.Currency.UNKNOWN
+        assert base_currency != Currencies.UNKNOWN and target_currency != Currencies.UNKNOWN
         if base_currency == target_currency:
             return 1
         rate, t = self.__exchange_rates.get((base_currency, target_currency), (None, 0))

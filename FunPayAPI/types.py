@@ -6,9 +6,10 @@ from __future__ import annotations
 import re
 from typing import Literal, overload, Optional
 
-import FunPayAPI.common.enums
-from .common.utils import RegularExpressions
-from .common.enums import MessageTypes, OrderStatuses, SubCategoryTypes, Currency
+
+from .common import MessageTypes, OrderStatuses, SubCategoryTypes, Currencies, PRODUCTS_AMOUNT_RE # TODO FunPayAPI.__init__.py
+
+
 import datetime
 
 
@@ -73,7 +74,8 @@ class ChatShortcut(BaseOrderInfo):
         """HTML код виджета чата."""
         BaseOrderInfo.__init__(self)
 
-    def get_last_message_type(self) -> MessageTypes:
+
+    def get_last_message_type(self) -> MessageTypes: # TODO property last_message_type
         """
         Определяет тип последнего сообщения в чате на основе регулярных выражений из MessageTypesRes.
 
@@ -83,42 +85,17 @@ class ChatShortcut(BaseOrderInfo):
         регулярных выражений.
 
         :return: тип последнего сообщения.
-        :rtype: :class:`FunPayAPI.common.enums.MessageTypes`
+        :rtype: MessageTypes
         """
-        res = RegularExpressions()
-        if res.DISCORD.search(self.last_message_text):
-            return MessageTypes.DISCORD
+        for message_type in MessageTypes:
+            if message_type is MessageTypes.NON_SYSTEM: continue
 
-        if res.DEAR_VENDORS.search(self.last_message_text):
-            return MessageTypes.DEAR_VENDORS
 
-        if res.ORDER_PURCHASED.findall(self.last_message_text) and res.ORDER_PURCHASED2.findall(self.last_message_text):
-            return MessageTypes.ORDER_PURCHASED
+            if message_type.value.search(self.last_message_text): return message_type
 
-        if res.ORDER_ID.search(self.last_message_text) is None:
-            return MessageTypes.NON_SYSTEM
 
-        # Регулярные выражения выставлены в порядке от самых часто-используемых к самым редко-используемым
-        sys_msg_types = {
-            MessageTypes.ORDER_CONFIRMED: res.ORDER_CONFIRMED,
-            MessageTypes.NEW_FEEDBACK: res.NEW_FEEDBACK,
-            MessageTypes.NEW_FEEDBACK_ANSWER: res.NEW_FEEDBACK_ANSWER,
-            MessageTypes.FEEDBACK_CHANGED: res.FEEDBACK_CHANGED,
-            MessageTypes.FEEDBACK_DELETED: res.FEEDBACK_DELETED,
-            MessageTypes.REFUND: res.REFUND,
-            MessageTypes.FEEDBACK_ANSWER_CHANGED: res.FEEDBACK_ANSWER_CHANGED,
-            MessageTypes.FEEDBACK_ANSWER_DELETED: res.FEEDBACK_ANSWER_DELETED,
-            MessageTypes.ORDER_CONFIRMED_BY_ADMIN: res.ORDER_CONFIRMED_BY_ADMIN,
-            MessageTypes.PARTIAL_REFUND: res.PARTIAL_REFUND,
-            MessageTypes.ORDER_REOPENED: res.ORDER_REOPENED,
-            MessageTypes.REFUND_BY_ADMIN: res.REFUND_BY_ADMIN
-        }
+        return MessageTypes.NON_SYSTEM
 
-        for i in sys_msg_types:
-            if sys_msg_types[i].search(self.last_message_text):
-                return i
-        else:
-            return MessageTypes.NON_SYSTEM
 
     def __str__(self):
         return self.last_message_text
@@ -271,7 +248,8 @@ class Message(BaseOrderInfo):
 
         BaseOrderInfo.__init__(self)
 
-    def get_message_type(self) -> MessageTypes:
+
+    def get_message_type(self) -> MessageTypes: # TODO property message_type
         """
         Определяет тип сообщения на основе регулярных выражений из MessageTypesRes.
 
@@ -281,44 +259,17 @@ class Message(BaseOrderInfo):
         Рекомендуется делать проверку на author_id == 0.
 
         :return: тип последнего сообщения в чате.
-        :rtype: :class:`FunPayAPI.common.enums.MessageTypes`
+        :rtype: MessageTypes
         """
-        if not self.text:
-            return MessageTypes.NON_SYSTEM
+        for message_type in MessageTypes:
+            if message_type is MessageTypes.NON_SYSTEM: continue
 
-        res = RegularExpressions()
-        if res.DISCORD.search(self.text):
-            return MessageTypes.DISCORD
-        if res.DEAR_VENDORS.search(self.text):
-            return MessageTypes.DEAR_VENDORS
 
-        if res.ORDER_PURCHASED.findall(self.text) and res.ORDER_PURCHASED2.findall(self.text):
-            return MessageTypes.ORDER_PURCHASED
+            if message_type.value.search(self.text): return message_type
 
-        if res.ORDER_ID.search(self.text) is None:
-            return MessageTypes.NON_SYSTEM
 
-        # Регулярные выражения выставлены в порядке от самых часто-используемых к самым редко-используемым
-        sys_msg_types = {
-            MessageTypes.ORDER_CONFIRMED: res.ORDER_CONFIRMED,
-            MessageTypes.NEW_FEEDBACK: res.NEW_FEEDBACK,
-            MessageTypes.NEW_FEEDBACK_ANSWER: res.NEW_FEEDBACK_ANSWER,
-            MessageTypes.FEEDBACK_CHANGED: res.FEEDBACK_CHANGED,
-            MessageTypes.FEEDBACK_DELETED: res.FEEDBACK_DELETED,
-            MessageTypes.REFUND: res.REFUND,
-            MessageTypes.FEEDBACK_ANSWER_CHANGED: res.FEEDBACK_ANSWER_CHANGED,
-            MessageTypes.FEEDBACK_ANSWER_DELETED: res.FEEDBACK_ANSWER_DELETED,
-            MessageTypes.ORDER_CONFIRMED_BY_ADMIN: res.ORDER_CONFIRMED_BY_ADMIN,
-            MessageTypes.PARTIAL_REFUND: res.PARTIAL_REFUND,
-            MessageTypes.ORDER_REOPENED: res.ORDER_REOPENED,
-            MessageTypes.REFUND_BY_ADMIN: res.REFUND_BY_ADMIN
-        }
+        return MessageTypes.NON_SYSTEM
 
-        for i in sys_msg_types:
-            if sys_msg_types[i].search(self.text):
-                return i
-        else:
-            return MessageTypes.NON_SYSTEM
 
     def __str__(self):
         return self.text if self.text is not None else self.image_link if self.image_link is not None else ""
@@ -338,7 +289,7 @@ class OrderShortcut(BaseOrderInfo):
     :type price: :obj:`float`
 
     :param currency: валюта заказа.
-    :type currency: :class:`FunPayAPI.common.enums.Currency`
+    :type currency: Currencies
 
     :param buyer_username: никнейм покупателя.
     :type buyer_username: :obj:`str`
@@ -350,7 +301,7 @@ class OrderShortcut(BaseOrderInfo):
     :type chat_id: :obj:`int` or :obj:`str`
 
     :param status: статус заказа.
-    :type status: :class:`FunPayAPI.common.enums.OrderStatuses`
+    :type status: OrderStatuses
 
     :param date: дата создания заказа.
     :type date: :class:`datetime.datetime`
@@ -368,7 +319,7 @@ class OrderShortcut(BaseOrderInfo):
     :type dont_search_amount: :obj:`bool`, опционально
     """
 
-    def __init__(self, id_: str, description: str, price: float, currency: Currency,
+    def __init__(self, id_: str, description: str, price: float, currency: Currencies,
                  buyer_username: str, buyer_id: int, chat_id: int | str, status: OrderStatuses,
                  date: datetime.datetime, subcategory_name: str, subcategory: SubCategory | None,
                  html: str, dont_search_amount: bool = False):
@@ -378,7 +329,7 @@ class OrderShortcut(BaseOrderInfo):
         """Описание заказа."""
         self.price: float = price
         """Цена заказа."""
-        self.currency: Currency = currency
+        self.currency: Currencies = currency
         """Валюта заказа."""
         self.amount: int | None = self.parse_amount() if not dont_search_amount else None
         """Кол-во товаров."""
@@ -407,10 +358,9 @@ class OrderShortcut(BaseOrderInfo):
         :return: кол-во купленного товара.
         :rtype: :obj:`int`
         """
-        res = RegularExpressions()
-        result = res.PRODUCTS_AMOUNT.findall(self.description)
+        result = PRODUCTS_AMOUNT_RE.findall(self.description)
         if result:
-            return int(result[0][0].replace(" ", ""))
+            return int(result[0].replace(" ", ""))
         return 1
 
     def __str__(self):
@@ -425,7 +375,7 @@ class Order:
     :type id_: :obj:`str`
 
     :param status: статус заказа.
-    :type status: :class:`FunPayAPI.common.enums.OrderStatuses`
+    :type status: OrderStatuses
 
     :param subcategory: подкатегория, к которой относится заказ.
     :type subcategory: :class:`FunPayAPI.types.SubCategory` or :obj:`None`
@@ -443,7 +393,7 @@ class Order:
     :type sum_: :obj:`float`
 
     :param currency: валюта заказа.
-    :type currency: :class:`FunPayAPI.common.enums.Currency`
+    :type currency: Currencies
 
     :param buyer_id: ID покупателя.
     :type buyer_id: :obj:`int`
@@ -472,7 +422,7 @@ class Order:
 
     def __init__(self, id_: str, status: OrderStatuses, subcategory: SubCategory | None,
                  lot_params: list[tuple[str, str]], buyer_params: dict[str, str], short_description: str | None,
-                 full_description: str | None, amount: int, sum_: float, currency: Currency,
+                 full_description: str | None, amount: int, sum_: float, currency: Currencies,
                  buyer_id: int, buyer_username: str,
                  seller_id: int, seller_username: str, chat_id: str | int,
                  html: str, review: Review | None, order_secrets: list[str]):
@@ -494,7 +444,7 @@ class Order:
         """Полное описание заказа."""
         self.sum: float = sum_
         """Сумма заказа."""
-        self.currency: Currency = currency
+        self.currency: Currencies = currency
         """Валюта заказа."""
         self.buyer_id: int = buyer_id
         """ID покупателя."""
@@ -601,7 +551,7 @@ class Category:
         Возвращает объект подкатегории.
 
         :param subcategory_type: тип подкатегории.
-        :type subcategory_type: :class:`FunPayAPI.common.enums.SubCategoryTypes`
+        :type subcategory_type: SubCategoryTypes
 
         :param subcategory_id: ID подкатегории.
         :type subcategory_id: :obj:`int`
@@ -625,7 +575,7 @@ class Category:
         Возвращает все подкатегории данной категории (игры) в виде словаря {type: {ID: подкатегория}}.
 
         :return: все подкатегории данной категории (игры) в виде словаря {type: ID: подкатегория}}.
-        :rtype: :obj:`dict` {:class:`FunPayAPI.common.enums.SubCategoryTypes`: :obj:`dict` {:obj:`int`, :class:`FunPayAPI.types.SubCategory`}}
+        :rtype: :obj:`dict` {SubCategoryTypes: :obj:`dict` {:obj:`int`, :class:`FunPayAPI.types.SubCategory`}}
         """
         return self.__sorted_subcategories
 
@@ -641,7 +591,7 @@ class SubCategory:
     :type name: :obj:`str`
 
     :param type_: тип лотов подкатегории.
-    :type type_: :class:`FunPayAPI.common.enums.SubCategoryTypes`
+    :type type_: SubCategoryTypes
 
     :param category: родительская категория (игра).
     :type category: :class:`FunPayAPI.types.Category`
@@ -681,11 +631,11 @@ class LotFields:
     :type subcategory: :class:`FunPayAPI.types.SubCategory` or :obj:`None`
 
     :param currency: валюта лота.
-    :type currency: :class:`FunPayAPI.common.enums.Currency`
+    :type currency: Currencies
     """
 
     def __init__(self, lot_id: int, fields: dict, subcategory: SubCategory | None = None,
-                 currency: Currency = Currency.UNKNOWN, calc_result: CalcResult | None = None):
+                 currency: Currencies = Currencies.UNKNOWN, calc_result: CalcResult | None = None):
         self.lot_id: int = lot_id
         """ID лота."""
         self.__fields: dict = fields
@@ -723,7 +673,7 @@ class LotFields:
         """Публичная ссылка на лот."""
         self.private_link: str = f"https://funpay.com/lots/offerEdit?offer={lot_id}"
         """Приватная ссылка на лот (на изменение лота)."""
-        self.currency: Currency = currency
+        self.currency: Currencies = currency
         """Валюта лота."""
         self.csrf_token: str | None = self.__fields.get("csrf_token")
         """CSRF-токен"""
@@ -963,7 +913,7 @@ class LotShortcut:
     :type price: :obj:`float`
 
     :param currency: валюта лота.
-    :type currency: :class:`FunPayAPI.common.enums.Currency`
+    :type currency: Currencies
 
     :param subcategory: подкатегория лота.
     :type subcategory: :class:`FunPayAPI.types.SubCategory`
@@ -973,7 +923,7 @@ class LotShortcut:
     """
 
     def __init__(self, id_: int | str, server: str | None, side: str | None,
-                 description: str | None, amount: int | None, price: float, currency: Currency,
+                 description: str | None, amount: int | None, price: float, currency: Currencies,
                  subcategory: SubCategory | None,
                  seller: SellerShortcut | None, auto: bool, promo: bool | None, attributes: dict[str, int | str] | None,
                  html: str):
@@ -993,7 +943,7 @@ class LotShortcut:
         """Количество"""
         self.price: float = price
         """Цена лота."""
-        self.currency: Currency = currency
+        self.currency: Currencies = currency
         """Валюта лота."""
         self.seller: SellerShortcut | None = seller
         """Объект продавца (только для лотов из талицы)."""
@@ -1032,7 +982,7 @@ class MyLotShortcut:
     :type price: :obj:`float`
 
     :param currency: валюта лота.
-    :type currency: :class:`FunPayAPI.common.enums.Currency`
+    :type currency: Currencies
 
     :param subcategory: подкатегория лота.
     :type subcategory: :class:`FunPayAPI.types.SubCategory`
@@ -1042,7 +992,7 @@ class MyLotShortcut:
     """
 
     def __init__(self, id_: int | str, server: str | None, side: str | None,
-                 description: str | None, amount: int | None, price: float, currency: Currency,
+                 description: str | None, amount: int | None, price: float, currency: Currencies,
                  subcategory: SubCategory | None, auto: bool, active: bool,
                  html: str):
         self.id: int | str = id_
@@ -1061,7 +1011,7 @@ class MyLotShortcut:
         """Количество"""
         self.price: float = price
         """Цена лота."""
-        self.currency: Currency = currency
+        self.currency: Currencies = currency
         """Валюта лота."""
         self.auto: bool = auto
         """Включена ли автовыдача FunPay у лота?"""
@@ -1170,7 +1120,7 @@ class UserProfile:
         :return: список всех лотов пользователя в виде словаря.
         :rtype: :obj:`dict` {:obj:`int` or :obj:`str`: :class:`FunPayAPI.types.LotShortcut`} (`mode==1`) \n
             :obj:`dict` {:class:`FunPayAPI.types.SubCategory`: :obj:`dict` {:obj:`int` or :obj:`str`: :class:`FunPayAPI.types.LotShortcut`}} (`mode==2`) \n
-            :obj:`dict` {:class:`FunPayAPI.common.enums.SubCategoryTypes`: :obj:`dict` {:obj:`int` or :obj:`str`: :class:`FunPayAPI.types.LotShortcut`}} (`mode==3`)
+            :obj:`dict` {SubCategoryTypes: :obj:`dict` {:obj:`int` or :obj:`str`: :class:`FunPayAPI.types.LotShortcut`}} (`mode==3`)
         """
         if mode == 1:
             return self.__lots_ids
@@ -1327,12 +1277,12 @@ class Balance:
 class PaymentMethod:
     """Объект, который описывает платежное средства при рассчете цены для покупателя"""
 
-    def __init__(self, name: str | None, price: float, currency: Currency, position: int | None):
+    def __init__(self, name: str | None, price: float, currency: Currencies, position: int | None):
         self.name: str | None = name
         """Название"""
         self.price: float = price
         """Цена (с комиссией)"""
-        self.currency: Currency = currency
+        self.currency: Currencies = currency
         """Валюта"""
         self.position: int | None = position
         """Позиция для сортировки"""
@@ -1342,8 +1292,8 @@ class CalcResult:
     """Класс, описывающий ответ на запрос о рассчете комиссии раздела."""
 
     def __init__(self, subcategory_type: SubCategoryTypes, subcategory_id: int, methods: list[PaymentMethod],
-                 price: float, min_price_with_commission: float | None, min_price_currency: Currency,
-                 account_currency: Currency):
+                 price: float, min_price_with_commission: float | None, min_price_currency: Currencies,
+                 account_currency: Currencies):
         self.subcategory_type: SubCategoryTypes = subcategory_type
         """Тип подкатегории."""
         self.subcategory_id: int = subcategory_id
@@ -1354,12 +1304,12 @@ class CalcResult:
         """Цена без комиссии"""
         self.min_price_with_commission: float | None = min_price_with_commission
         """Минимальная цена с комиссией из ответа FunPay, наличие не обязательно."""
-        self.min_price_currency: Currency = min_price_currency
+        self.min_price_currency: Currencies = min_price_currency
         """Валюта минимальной цены"""
         self.account_currency = account_currency
         """Валюта аккаунта"""
 
-    def get_coefficient(self, currency: Currency):
+    def get_coefficient(self, currency: Currencies):
         """Отношение цены с комиссией в переданной валюте к цене без комиссии в валюте аккаунта."""
         if self.min_price_with_commission and currency == self.min_price_currency == self.account_currency:
             return self.min_price_with_commission / self.price

@@ -1,8 +1,8 @@
 from __future__ import annotations
 import time
-from ..common import utils
-from ..common.enums import *
 from .. import types
+
+from ..common import EventTypes, generate_random_tag
 
 
 class BaseEvent:
@@ -13,7 +13,7 @@ class BaseEvent:
     :type runner_tag: :obj:`str`
 
     :param event_type: тип события.
-    :type event_type: :class:`FunPayAPI.common.enums.EventTypes`
+    :type event_type: EventTypes
 
     :param event_time: время события (лучше не указывать, будет генерироваться автоматически).
     :type event_time: :obj:`int` or :obj:`float` or :obj:`None`, опционально.
@@ -95,7 +95,7 @@ class MessageEventsStack:
     Нужен для того, чтобы сразу предоставить доступ ко всем событиям новых сообщений от одного пользователя и одного запроса Runner'а.
     """
     def __init__(self):
-        self.__id = utils.random_tag()
+        self.__id = generate_random_tag()
         self.__stack = []
 
     def add_events(self, messages: list[NewMessageEvent]):

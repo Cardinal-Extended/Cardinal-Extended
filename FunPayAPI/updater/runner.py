@@ -13,6 +13,10 @@ from bs4 import BeautifulSoup
 from ..common import exceptions
 from .events import *
 
+
+from ..common import OrderStatuses, generate_random_tag # TODO FunPayAPI.__init__.py
+
+
 logger = logging.getLogger("FunPayAPI.runner")
 
 
@@ -55,8 +59,8 @@ class Runner:
         """Делать ли доп запросы для получения новых / изменившихся заказов?"""
 
         self.__first_request = True
-        self.__last_msg_event_tag = utils.random_tag()
-        self.__last_order_event_tag = utils.random_tag()
+        self.__last_msg_event_tag = generate_random_tag()
+        self.__last_order_event_tag = generate_random_tag()
 
         self.saved_orders: dict[str, types.OrderShortcut] = {}
         """Сохраненные состояния заказов ({ID заказа: экземпляр types.OrderShortcut})."""
@@ -353,7 +357,7 @@ class Runner:
                     events.append(InitialOrderEvent(self.__last_order_event_tag, order))
                 else:
                     events.append(NewOrderEvent(self.__last_order_event_tag, order))
-                    if order.status == types.OrderStatuses.CLOSED:
+                    if order.status == OrderStatuses.CLOSED:
                         events.append(OrderStatusChangedEvent(self.__last_order_event_tag, order))
 
             elif order.status != self.saved_orders[order.id].status:

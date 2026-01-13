@@ -1,8 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Literal, Any, Optional, IO
 
-import FunPayAPI.common.enums
-from FunPayAPI.common.utils import parse_currency, RegularExpressions
 from .types import PaymentMethod, CalcResult
 
 if TYPE_CHECKING:
@@ -22,7 +20,11 @@ import re
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from . import types
-from .common import exceptions, utils, enums
+from .common import exceptions
+
+
+from .common import MessageTypes, OrderStatuses, SubCategoryTypes, Currencies, Wallets, Months, generate_random_tag, PRODUCTS_AMOUNT_RE, EXCHANGE_RATE_RE
+
 
 logger = logging.getLogger("FunPayAPI.account")
 PRIVATE_CHAT_ID_RE = re.compile(r"users-\d+-\d+$")
@@ -95,7 +97,7 @@ class Account:
         """Язык по для получения названий разделов."""
         self.__set_locale: Literal["ru", "en", "uk"] | None = None
         """Язык, на который будет переведем аккаунт при следующем GET-запросе."""
-        self.currency: FunPayAPI.types.Currency = FunPayAPI.types.Currency.UNKNOWN
+        self.currency: Currencies = Currencies.UNKNOWN
         """Валюта аккаунта"""
         self.total_balance: int | None = None
         """Примерный общий баланс аккаунта в валюте аккаунта."""
@@ -117,9 +119,9 @@ class Account:
         self.__sorted_categories: dict[int, types.Category] = {}
 
         self.__subcategories: list[types.SubCategory] = []
-        self.__sorted_subcategories: dict[types.SubCategoryTypes, dict[int, types.SubCategory]] = {
-            types.SubCategoryTypes.COMMON: {},
-            types.SubCategoryTypes.CURRENCY: {}
+        self.__sorted_subcategories: dict[SubCategoryTypes, dict[int, types.SubCategory]] = {
+            SubCategoryTypes.COMMON: {},
+            SubCategoryTypes.CURRENCY: {}
         }
 
         self.__bot_character = "⁡"
@@ -259,7 +261,7 @@ class Account:
         if balance:
             balance, currency = balance.text.rsplit(" ", maxsplit=1)
             self.total_balance = int(balance.replace(" ", ""))
-            self.currency = parse_currency(currency)
+            self.currency = Currencies(currency)
         else:
             self.total_balance = 0
         active_purchases = parser.find("span", {"class": "badge badge-orders"})
@@ -276,13 +278,13 @@ class Account:
         self.__initiated = True
         return self
 
-    def get_subcategory_public_lots(self, subcategory_type: enums.SubCategoryTypes, subcategory_id: int,
+    def get_subcategory_public_lots(self, subcategory_type: SubCategoryTypes, subcategory_id: int,
                                     locale: Literal["ru", "en", "uk"] | None = None) -> list[types.LotShortcut]:
         """
         Получает список всех опубликованных лотов переданной подкатегории.
 
         :param subcategory_type: тип подкатегории.
-        :type subcategory_type: :class:`FunPayAPI.enums.SubCategoryTypes`
+        :type subcategory_type: SubCategoryTypes
 
         :param subcategory_id: ID подкатегории.
         :type subcategory_id: :obj:`int`
@@ -293,7 +295,7 @@ class Account:
         if not self.is_initiated:
             raise exceptions.AccountNotInitiatedError()
 
-        meth = f"lots/{subcategory_id}/" if subcategory_type is enums.SubCategoryTypes.COMMON else f"chips/{subcategory_id}/"
+        meth = f"lots/{subcategory_id}/" if subcategory_type is SubCategoryTypes.COMMON else f"chips/{subcategory_id}/"
         if not locale:
             locale = self.__lots_parse_locale
         response = self.method("get", meth, {"accept": "*/*"}, {}, raise_not_200=True, locale=locale)
@@ -325,12 +327,12 @@ class Account:
             side = offer.find("div", class_="tc-side")
             side = side.text if side else None
             tc_price = offer.find("div", {"class": "tc-price"})
-            if subcategory_type is types.SubCategoryTypes.COMMON:
+            if subcategory_type is SubCategoryTypes.COMMON:
                 price = float(tc_price["data-s"])
             else:
                 price = float(tc_price.find("div").text.rsplit(maxsplit=1)[0].replace(" ", ""))
             if currency is None:
-                currency = parse_currency(tc_price.find("span", class_="unit").text)
+                currency = Currencies(tc_price.find("span", class_="unit").text)
                 if self.currency != currency:
                     self.currency = currency
             seller_soup = offer.find("div", class_="tc-user")
@@ -399,7 +401,7 @@ class Account:
         if not offers:
             return []
 
-        subcategory_obj = self.get_subcategory(enums.SubCategoryTypes.COMMON, subcategory_id)
+        subcategory_obj = self.get_subcategory(SubCategoryTypes.COMMON, subcategory_id)
         result = []
         currency = None
         for offer in offers:
@@ -413,7 +415,7 @@ class Account:
             tc_price = offer.find("div", class_="tc-price")
             price = float(tc_price["data-s"])
             if currency is None:
-                currency = parse_currency(tc_price.find("span", class_="unit").text)
+                currency = Currencies(tc_price.find("span", class_="unit").text)
                 if self.currency != currency:
                     self.currency = currency
             auto = bool(tc_price.find("i", class_="auto-dlv-icon"))
@@ -480,7 +482,7 @@ class Account:
                     if photos:
                         image_urls = [photo.get("href") for photo in photos]
 
-        return types.LotPage(lot_id, self.get_subcategory(enums.SubCategoryTypes.COMMON, subcategory_id),
+        return types.LotPage(lot_id, self.get_subcategory(SubCategoryTypes.COMMON, subcategory_id),
                              short_description, detailed_description, image_urls, seller_id, seller_username)
 
     def get_balance(self, lot_id: int) -> types.Balance:
@@ -510,52 +512,6 @@ class Account:
                                 float(balances["data-balance-total-usd"]), float(balances["data-balance-usd"]),
                                 float(balances["data-balance-total-eur"]), float(balances["data-balance-eur"]))
         return balance
-
-    # def get_withdraw_payment_data(self) -> types.WithdrawPaymentData:
-    #     if not self.is_initiated:
-    #         raise exceptions.AccountNotInitiatedError()
-    #     response = self.method("get", f"account/balance", {"accept": "*/*"}, {}, raise_not_200=True)
-    #     html_response = response.content.decode()
-    #     parser = BeautifulSoup(html_response, "lxml")
-    #
-    #     username = parser.find("div", {"class": "user-link-name"})
-    #     if not username:
-    #         raise exceptions.UnauthorizedError(response)
-    #
-    #     self.__update_csrf_token(parser)
-    #     data_data = parser.find("div", class_="withdraw-box").get("data-data")
-    #     parsed_data = json.loads(html.unescape(data_data))
-    #     ext_currencies = {}
-    #     for ext_currency_name, ext_currency_data in parsed_data["extCurrencies"].items():
-    #         wallet_info = WithdrawWalletInfo(
-    #             ext_currency=ext_currency_name,
-    #             name=ext_currency_data["name"],
-    #             unit=ext_currency_data["unit"],
-    #             wallet_name=ext_currency_data["walletName"],
-    #             wallets=ext_currency_data["wallets"]
-    #         )
-    #         ext_currencies[ext_currency_name] = wallet_info
-    #
-    #     currencies = {}
-    #     for currency_name, currency_data in parsed_data["currencies"].items():
-    #         channels = []
-    #         for channel_data in currency_data["channels"]:
-    #             ext_currency = channel_data["extCurrency"]
-    #             wallet_info = ext_currencies.get(ext_currency)
-    #             channel_info = WithdrawMethod(
-    #                 name=channel_data["name"],
-    #                 ext_currency=ext_currency,
-    #                 fee_info=channel_data["feeInfo"],
-    #                 wallet_info=wallet_info
-    #             )
-    #             channels.append(channel_info)
-    #         currency = parse_currency(currency_data["unit"])
-    #         currency_info = WithdrawCurrencyInfo(
-    #             currency=currency,
-    #             channels=channels
-    #         )
-    #         currencies[currency] = currency_info
-    #     return WithdrawPaymentData(ext_currencies=ext_currencies, currencies=currencies)
 
     def get_chat_history(self, chat_id: int | str, last_message_id: int = 99999999999999999999999,
                          interlocutor_username: Optional[str] = None, from_id: int = 0) -> list[types.Message]:
@@ -974,15 +930,15 @@ class Account:
         if response.json().get("error"):
             raise exceptions.RefundError(response, response.json().get("msg"), order_id)
 
-    def withdraw(self, currency: enums.Currency, wallet: enums.Wallet, amount: int | float, address: str) -> float:
+    def withdraw(self, currency: Currencies, wallet: Wallets, amount: int | float, address: str) -> float:
         """
         Отправляет запрос на вывод средств.
 
         :param currency: валюта.
-        :type currency: :class:`FunPayAPI.common.enums.Currency`
+        :type currency: Currencies
 
         :param wallet: тип кошелька.
-        :type wallet: :class:`FunPayAPI.common.enums.Wallet`
+        :type wallet: Wallets
 
         :param amount: кол-во средств.
         :type amount: :obj:`int` or :obj:`float`
@@ -997,14 +953,14 @@ class Account:
             raise exceptions.AccountNotInitiatedError()
 
         wallets = {
-            enums.Wallet.QIWI: "qiwi",
-            enums.Wallet.YOUMONEY: "fps",
-            enums.Wallet.BINANCE: "binance",
-            enums.Wallet.TRC: "usdt_trc",
-            enums.Wallet.CARD_RUB: "card_rub",
-            enums.Wallet.CARD_USD: "card_usd",
-            enums.Wallet.CARD_EUR: "card_eur",
-            enums.Wallet.WEBMONEY: "wmz"
+            Wallets.QIWI: "qiwi",
+            Wallets.YOUMONEY: "fps",
+            Wallets.BINANCE: "binance",
+            Wallets.TRC: "usdt_trc",
+            Wallets.CARD_RUB: "card_rub",
+            Wallets.CARD_USD: "card_usd",
+            Wallets.CARD_EUR: "card_eur",
+            Wallets.WEBMONEY: "wmz"
         }
         headers = {
             "accept": "*/*",
@@ -1012,7 +968,7 @@ class Account:
         }
         payload = {
             "csrf_token": self.csrf_token,
-            "currency_id": currency.code,
+            "currency_id": currency.name.lower(),
             "ext_currency_id": wallets[wallet],
             "wallet": address,
             "amount_int": str(amount)
@@ -1081,15 +1037,15 @@ class Account:
             subcats = []
             for i in subcategories:
                 if isinstance(i, types.SubCategory):
-                    if i.type is types.SubCategoryTypes.COMMON and i.category.id == category.id and i.id not in exclude:
+                    if i.type is SubCategoryTypes.COMMON and i.category.id == category.id and i.id not in exclude:
                         subcats.append(i)
                 else:
-                    if not (subcat := category.get_subcategory(types.SubCategoryTypes.COMMON, i)):
+                    if not (subcat := category.get_subcategory(SubCategoryTypes.COMMON, i)):
                         continue
                     subcats.append(subcat)
         else:
             subcats = [i for i in category.get_subcategories() if
-                       i.type is types.SubCategoryTypes.COMMON and i.id not in exclude]
+                       i.type is SubCategoryTypes.COMMON and i.id not in exclude]
 
         headers = {
             "accept": "*/*",
@@ -1111,7 +1067,7 @@ class Account:
             raise exceptions.RaiseError(response, category, json_response.get("url"), 7200)
         elif json_response.get("error") and json_response.get("msg") and \
                 any([i in json_response.get("msg") for i in ("Подождите ", "Please wait ", "Зачекайте ")]):
-            wait_time = utils.parse_wait_time(json_response.get("msg"))
+            wait_time = self.__parse_wait_time(json_response.get("msg"))
             raise exceptions.RaiseError(response, category, json_response.get("msg"), wait_time)
         else:
             raise exceptions.RaiseError(response, category, json_response.get("msg"), None)
@@ -1159,8 +1115,8 @@ class Account:
         for i in subcategories_divs:
             subcategory_link = i.find("h3").find("a").get("href")
             subcategory_id = int(subcategory_link.split("/")[-2])
-            subcategory_type = types.SubCategoryTypes.CURRENCY if "chips" in subcategory_link else \
-                types.SubCategoryTypes.COMMON
+            subcategory_type = SubCategoryTypes.CURRENCY if "chips" in subcategory_link else \
+                SubCategoryTypes.COMMON
             subcategory_obj = self.get_subcategory(subcategory_type, subcategory_id)
             if not subcategory_obj:
                 continue
@@ -1180,13 +1136,13 @@ class Account:
                 tc_amount = j.find("div", class_="tc-amount")
                 amount = tc_amount.text.replace(" ", "") if tc_amount else None
                 amount = int(amount) if amount and amount.isdigit() else None
-                if subcategory_obj.type is types.SubCategoryTypes.COMMON:
+                if subcategory_obj.type is SubCategoryTypes.COMMON:
                     price = float(tc_price["data-s"])
                 else:
                     price = float(tc_price.find("div").text.rsplit(maxsplit=1)[0].replace(" ", ""))
                 if currency is None:
-                    currency = parse_currency(tc_price.find("span", class_="unit").text)
-                    if self.currency != currency:
+                    currency = Currencies(tc_price.find("span", class_="unit").text)
+                    if self.currency != currency: # TODO
                         self.currency = currency
                 lot_obj = types.LotShortcut(offer_id, server, side, description, amount, price, currency,
                                             subcategory_obj,
@@ -1279,16 +1235,16 @@ class Account:
 
         if (span := parser.find("span", {"class": "text-warning"})) and span.text in (
                 "Возврат", "Повернення", "Refund"):
-            status = types.OrderStatuses.REFUNDED
+            status = OrderStatuses.REFUNDED
         elif (span := parser.find("span", {"class": "text-success"})) and span.text in ("Закрыт", "Закрито", "Closed"):
-            status = types.OrderStatuses.CLOSED
+            status = OrderStatuses.CLOSED
         else:
-            status = types.OrderStatuses.PAID
+            status = OrderStatuses.PAID
 
         short_description = None
         full_description = None
         sum_ = None
-        currency = FunPayAPI.common.enums.Currency.UNKNOWN
+        currency = Currencies.UNKNOWN
         subcategory = None
         order_secrets = []
         stop_params = False
@@ -1310,14 +1266,14 @@ class Account:
                 full_description = div.find("div").text
             elif h.text in ("Сумма", "Сума", "Total"):
                 sum_ = float(div.find("span").text.replace(" ", ""))
-                currency = parse_currency(div.find("strong").text)
+                currency = Currencies(div.find("strong").text)
             elif h.text in ("Категория", "Категорія", "Category",
                             "Валюта", "Currency"):
                 subcategory_link = div.find("a").get("href")
                 subcategory_split = subcategory_link.split("/")
                 subcategory_id = int(subcategory_split[-2])
-                subcategory_type = types.SubCategoryTypes.COMMON if "lots" in subcategory_link else \
-                    types.SubCategoryTypes.CURRENCY
+                subcategory_type = SubCategoryTypes.COMMON if "lots" in subcategory_link else \
+                    SubCategoryTypes.CURRENCY
                 subcategory = self.get_subcategory(subcategory_type, subcategory_id)
             elif h.text in ("Оплаченный товар", "Оплаченные товары",
                             "Оплачений товар", "Оплачені товари",
@@ -1327,9 +1283,9 @@ class Account:
             elif h.text in ("Количество", "Amount", "Кількість"):
                 div2 = div.find("div", class_="text-bold")
                 if div2:
-                    match = RegularExpressions().PRODUCTS_AMOUNT_ORDER.fullmatch(div2.text)
+                    match = PRODUCTS_AMOUNT_RE.fullmatch(div2.text)
                     if match:
-                        amount = int(match.group(1).replace(" ", ""))
+                        amount = int(match.groupdict()['amount'].replace(" ", ""))
             elif h.text in ("Відкрито", "Открыт", "Open"):
                 continue  # todo
             elif h.text in ("Закрито", "Закрыт", "Closed"):
@@ -1390,7 +1346,7 @@ class Account:
                   state: Optional[Literal["closed", "paid", "refunded"]] = None, game: Optional[int] = None,
                   section: Optional[str] = None, server: Optional[int] = None,
                   side: Optional[int] = None, locale: Literal["ru", "en", "uk"] | None = None,
-                  subcategories: dict[str, tuple[types.SubCategoryTypes, int]] | None = None, **more_filters) -> \
+                  subcategories: dict[str, tuple[SubCategoryTypes, int]] | None = None, **more_filters) -> \
             tuple[str | None, list[types.OrderShortcut], Literal["ru", "en", "uk"],
             dict[str, types.SubCategory]]:
         """
@@ -1489,7 +1445,7 @@ class Account:
                     sections_list = json.loads(game_option.get("data-data"))
                     for key, section_name in sections_list:
                         section_type, section_id = key.split("-")
-                        section_type = types.SubCategoryTypes.COMMON if section_type == "lot" else types.SubCategoryTypes.CURRENCY
+                        section_type = SubCategoryTypes.COMMON if section_type == "lot" else SubCategoryTypes.CURRENCY
                         section_id = int(section_id)
                         subcategories[f"{game_name}, {section_name}"] = self.get_subcategory(section_type, section_id)
             else:
@@ -1503,15 +1459,15 @@ class Account:
             if "warning" in classname:
                 if not include_refunded:
                     continue
-                order_status = types.OrderStatuses.REFUNDED
+                order_status = OrderStatuses.REFUNDED
             elif "info" in classname:
                 if not include_paid:
                     continue
-                order_status = types.OrderStatuses.PAID
+                order_status = OrderStatuses.PAID
             else:
                 if not include_closed:
                     continue
-                order_status = types.OrderStatuses.CLOSED
+                order_status = OrderStatuses.CLOSED
 
             order_id = div.find("div", {"class": "tc-order"}).text[1:]
             if order_id in exclude_ids:
@@ -1521,7 +1477,7 @@ class Account:
             tc_price = div.find("div", {"class": "tc-price"}).text
             price, currency = tc_price.rsplit(maxsplit=1)
             price = float(price.replace(" ", ""))
-            currency = parse_currency(currency)
+            currency = Currencies(currency)
 
             buyer_div = div.find("div", {"class": "media-user-name"}).find("span")
             buyer_username = buyer_div.text
@@ -1543,13 +1499,13 @@ class Account:
             elif order_date_text.count(" ") == 2:  # ДД месяца, ЧЧ:ММ
                 split = order_date_text.split(", ")
                 day, month = split[0].split()
-                day, month = int(day), utils.MONTHS[month]
+                day, month = int(day), Months[month]
                 h, m = split[1].split(":")
                 order_date = datetime(now.year, month, day, int(h), int(m))
             else:  # ДД месяца ГГГГ, ЧЧ:ММ
                 split = order_date_text.split(", ")
                 day, month, year = split[0].split()
-                day, month, year = int(day), utils.MONTHS[month], int(year)
+                day, month, year = int(day), Months[month], int(year)
                 h, m = split[1].split(":")
                 order_date = datetime(year, month, day, int(h), int(m))
             id1, id2 = sorted([buyer_id, self.id])
@@ -1592,7 +1548,7 @@ class Account:
         chats = {
             "type": "chat_bookmarks",
             "id": self.id,
-            "tag": utils.random_tag(),
+            "tag": generate_random_tag(),
             "data": False
         }
         payload = {
@@ -1709,12 +1665,12 @@ class Account:
         self.add_chats(self.request_chats())
         return self.get_chat_by_id(chat_id)
 
-    def calc(self, subcategory_type: enums.SubCategoryTypes, subcategory_id: int | None = None,
+    def calc(self, subcategory_type: SubCategoryTypes, subcategory_id: int | None = None,
              game_id: int | None = None, price: int | float = 1000):
         if not self.is_initiated:
             raise exceptions.AccountNotInitiatedError()
 
-        if subcategory_type == types.SubCategoryTypes.COMMON:
+        if subcategory_type == SubCategoryTypes.COMMON:
             key = "nodeId"
             type_ = "lots"
             value = subcategory_id
@@ -1739,13 +1695,13 @@ class Account:
         methods = []
         for method in json_resp.get("methods"):
             methods.append(PaymentMethod(method.get("name"), float(method["price"].replace(" ", "")),
-                                         parse_currency(method.get("unit")), method.get("sort")))
+                                         Currencies(method.get("unit")), method.get("sort")))
         if "minPrice" in json_resp:
             min_price, min_price_currency = json_resp["minPrice"].rsplit(" ", maxsplit=1)
             min_price = float(min_price.replace(" ", ""))
-            min_price_currency = parse_currency(min_price_currency)
+            min_price_currency = Currencies(min_price_currency)
         else:
-            min_price, min_price_currency = None, FunPayAPI.types.Currency.UNKNOWN
+            min_price, min_price_currency = None, Currencies.UNKNOWN
         return CalcResult(subcategory_type, subcategory_id, methods, price, min_price, min_price_currency,
                           self.currency)
 
@@ -1779,9 +1735,9 @@ class Account:
             "hidden" not in field.find_parent(class_="form-group").get("class", [])
         })
         result.update({field["name"]: "on" for field in bs.find_all("input", {"type": "checkbox"}, checked=True)})
-        subcategory = self.get_subcategory(enums.SubCategoryTypes.COMMON, int(result.get("node_id", 0)))
+        subcategory = self.get_subcategory(SubCategoryTypes.COMMON, int(result.get("node_id", 0)))
         self.csrf_token = result.get("csrf_token") or self.csrf_token
-        currency = utils.parse_currency(bs.find("span", class_="form-control-feedback").text)
+        currency = Currencies(bs.find("span", class_="form-control-feedback").text)
         if self.currency != currency:
             self.currency = currency
         bs_buyer_prices = bs.find("table", class_="table-buyers-prices").find_all("tr")
@@ -1789,10 +1745,10 @@ class Account:
         for i, pm in enumerate(bs_buyer_prices):
             pm_price, pm_currency = pm.find("td").text.rsplit(maxsplit=1)
             pm_price = float(pm_price.replace(" ", ""))
-            pm_currency = parse_currency(pm_currency)
+            pm_currency = Currencies(pm_currency)
             payment_methods.append(PaymentMethod(pm.find("th").text, pm_price, pm_currency, i))
-        calc_result = CalcResult(types.SubCategoryTypes.COMMON, subcategory.id, payment_methods,
-                                 float(result["price"]), None, types.Currency.UNKNOWN, currency)
+        calc_result = CalcResult(SubCategoryTypes.COMMON, subcategory.id, payment_methods,
+                                 float(result["price"]), None, Currencies.UNKNOWN, currency)
         return types.LotFields(lot_id, result, subcategory, currency, calc_result)
 
     def get_chip_fields(self, subcategory_id: int) -> types.ChipFields:
@@ -1856,21 +1812,21 @@ class Account:
         """
         self.save_lot(types.LotFields(lot_id, {"csrf_token": self.csrf_token, "offer_id": lot_id, "deleted": "1"}))
 
-    def get_exchange_rate(self, currency: types.Currency) -> tuple[float, types.Currency]:
+    def get_exchange_rate(self, currency: Currencies) -> tuple[float, Currencies]:
         """
         Получает курс обмена текущей валюты аккаунта на переданную, обновляет валюту аккаунта.
         Возвращает X, где X <currency> = 1 <валюта аккаунта> и текущую валюту аккаунта.
 
         :param currency: Валюта, на которую нужно получить курс обмена.
-        :type currency: :obj:`types.Currency`
+        :type currency: Currencies
         
         :return: Кортеж, содержащий коэффициент обмена и текущую валюту аккаунта.
-        :rtype: :obj:`tuple[float, types.Currency]`
+        :rtype: :obj:`tuple[float, Currencies]`
         """
         r = self.method("post", "https://funpay.com/account/switchCurrency",
                         {"accept": "*/*", "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
                          "x-requested-with": "XMLHttpRequest"},
-                        {"cy": currency.code, "csrf_token": self.csrf_token, "confirmed": "false"},
+                        {"cy": currency.name.lower(), "csrf_token": self.csrf_token, "confirmed": "false"},
                         raise_not_200=True)
         b = json.loads(r.text)
         if "url" in b and not b["url"]:
@@ -1878,14 +1834,14 @@ class Account:
             return 1, currency
         else:
             s = BeautifulSoup(b["modal"], "lxml").find("p", class_="lead").text.replace("\xa0", " ")
-            match = RegularExpressions().EXCHANGE_RATE.fullmatch(s)
+            match = EXCHANGE_RATE_RE.fullmatch(s)
             assert match is not None
-            swipe_to = match.group(2)
-            assert swipe_to.lower() == currency.code
-            price1 = float(match.group(4))
-            currency1 = parse_currency(match.group(5))
-            price2 = float(match.group(7))
-            currency2 = parse_currency(match.group(8))
+            swipe_to = match.groupdict()['currency_to']
+            assert swipe_to.lower() == currency.name.lower()
+            price1 = float(match.groupdict()['exchange_rate_currency_from'])
+            currency1 = Currencies(match.groupdict()['currency_from_symbol'])
+            price2 = float(match.groupdict()['exchange_rate_currency_to'])
+            currency2 = Currencies(match.groupdict()['currency_to_symbol'])
             now_currency = ({currency1, currency2} - {currency, }).pop()
             self.currency = now_currency
             if now_currency == currency1:
@@ -1925,13 +1881,13 @@ class Account:
         """
         return self.__sorted_categories
 
-    def get_subcategory(self, subcategory_type: types.SubCategoryTypes,
+    def get_subcategory(self, subcategory_type: SubCategoryTypes,
                         subcategory_id: int) -> types.SubCategory | None:
         """
         Возвращает объект подкатегории.
 
         :param subcategory_type: тип подкатегории.
-        :type subcategory_type: :class:`FunPayAPI.common.enums.SubCategoryTypes`
+        :type subcategory_type: SubCategoryTypes
 
         :param subcategory_id: ID подкатегории.
         :type subcategory_id: :obj:`int`
@@ -1951,13 +1907,13 @@ class Account:
         """
         return self.__subcategories
 
-    def get_sorted_subcategories(self) -> dict[types.SubCategoryTypes, dict[int, types.SubCategory]]:
+    def get_sorted_subcategories(self) -> dict[SubCategoryTypes, dict[int, types.SubCategory]]:
         """
         Возвращает все подкатегории FunPay в виде словаря {тип подкатегории: {ID: подкатегория}}
         (парсятся при первом выполнении метода Account.get).
 
         :return: все подкатегории FunPay в виде словаря {тип подкатегории: {ID: подкатегория}}
-        :rtype: :obj:`dict` {:class:`FunPayAPI.common.enums.SubCategoryTypes`: :obj:`dict` {:obj:`int` :class:`FunPayAPI.types.SubCategory`}}
+        :rtype: :obj:`dict` {SubCategoryTypes: :obj:`dict` {:obj:`int` :class:`FunPayAPI.types.SubCategory`}}
         """
         return self.__sorted_subcategories
 
@@ -2017,7 +1973,7 @@ class Account:
                 for k in subcategories:
                     a = k.find("a")
                     name, link = a.text, a["href"]
-                    stype = types.SubCategoryTypes.CURRENCY if "chips" in link else types.SubCategoryTypes.COMMON
+                    stype = SubCategoryTypes.CURRENCY if "chips" in link else SubCategoryTypes.COMMON
                     sid = int(link.split("/")[-2])
                     sobj = types.SubCategory(sid, name, stype, regional_games[j_game_id], subcategory_position)
                     subcategory_position += 1
@@ -2092,7 +2048,7 @@ class Account:
                                         None, author_id, i["html"], image_link, image_name, determine_msg_type=False)
             message_obj.by_bot = by_bot
             message_obj.by_vertex = by_vertex
-            message_obj.type = types.MessageTypes.NON_SYSTEM if author_id != 0 else message_obj.get_message_type()
+            message_obj.type = MessageTypes.NON_SYSTEM if author_id != 0 else message_obj.get_message_type()
 
             messages.append(message_obj)
 
@@ -2117,23 +2073,23 @@ class Account:
                 if default_label.text in ("автовідповідь", "автоответ", "auto-reply"):
                     i.is_autoreply = True
             i.badge = default_label.text if (i.badge is None and default_label is not None) else i.badge
-            if i.type != types.MessageTypes.NON_SYSTEM:
+            if i.type != MessageTypes.NON_SYSTEM:
                 users = parser.find_all('a', href=lambda href: href and '/users/' in href)
                 if users:
                     i.initiator_username = users[0].text
                     i.initiator_id = int(users[0]["href"].split("/")[-2])
-                    if i.type in (types.MessageTypes.ORDER_PURCHASED, types.MessageTypes.ORDER_CONFIRMED,
-                                  types.MessageTypes.NEW_FEEDBACK,
-                                  types.MessageTypes.FEEDBACK_CHANGED,
-                                  types.MessageTypes.FEEDBACK_DELETED):
+                    if i.type in (MessageTypes.ORDER_PURCHASED, MessageTypes.ORDER_CONFIRMED,
+                                  MessageTypes.NEW_FEEDBACK,
+                                  MessageTypes.FEEDBACK_CHANGED,
+                                  MessageTypes.FEEDBACK_DELETED):
                         if i.initiator_id == self.id:
                             i.i_am_seller = False
                             i.i_am_buyer = True
                         else:
                             i.i_am_seller = True
                             i.i_am_buyer = False
-                    elif i.type in (types.MessageTypes.NEW_FEEDBACK_ANSWER, types.MessageTypes.FEEDBACK_ANSWER_CHANGED,
-                                    types.MessageTypes.FEEDBACK_ANSWER_DELETED, types.MessageTypes.REFUND):
+                    elif i.type in (MessageTypes.NEW_FEEDBACK_ANSWER, MessageTypes.FEEDBACK_ANSWER_CHANGED,
+                                    MessageTypes.FEEDBACK_ANSWER_DELETED, MessageTypes.REFUND):
                         if i.initiator_id == self.id:
                             i.i_am_seller = True
                             i.i_am_buyer = False
@@ -2142,14 +2098,14 @@ class Account:
                             i.i_am_buyer = True
                     elif len(users) > 1:
                         last_user_id = int(users[-1]["href"].split("/")[-2])
-                        if i.type == types.MessageTypes.ORDER_CONFIRMED_BY_ADMIN:
+                        if i.type == MessageTypes.ORDER_CONFIRMED_BY_ADMIN:
                             if last_user_id == self.id:
                                 i.i_am_seller = True
                                 i.i_am_buyer = False
                             else:
                                 i.i_am_seller = False
                                 i.i_am_buyer = True
-                        elif i.type == types.MessageTypes.REFUND_BY_ADMIN:
+                        elif i.type == MessageTypes.REFUND_BY_ADMIN:
                             if last_user_id == self.id:
                                 i.i_am_seller = False
                                 i.i_am_buyer = True
@@ -2204,3 +2160,23 @@ class Account:
     def locale(self, new_locale: Literal["ru", "en", "uk"]):
         if self.__locale != new_locale and new_locale in ("ru", "en", "uk"):
             self.__set_locale = new_locale
+
+
+    @staticmethod
+    def __parse_wait_time(response: str) -> int:
+        """
+        Парсит ответ FunPay на запрос о поднятии лотов.
+
+        :param response: текст ответа.
+
+        :return: Примерное время ожидание до следующего поднятия лотов (в секундах).
+        """
+        x = "".join([i for i in response if i.isdigit()])
+        if "секунд" in response or "second" in response:
+            return int(x) if x else 2
+        elif "минут" in response or "хвилин" in response or "minute" in response:
+            return (int(x) - 1 if x else 1) * 60
+        elif "час" in response or "годин" in response or "hour" in response:
+            return int((int(x) - 0.5 if x else 1) * 3600)
+        else:
+            return 10
