@@ -11,11 +11,11 @@ from typing import Any
 
 
 __all__ = [
-    '_Config'
+    'Config'
 ]
 
 
-class _Config:
+class Config:
     __locks: dict[str, Lock] = {
         'init_lock': Lock(),
         'default_lock': Lock()
@@ -36,7 +36,7 @@ class _Config:
         :param section: Секция конфига, отображаемая в Config.config, defaults to None.
         :type section: str | None, optional
         '''
-        with _Config.__locks['init_lock']:
+        with Config.__locks['init_lock']:
             self.__section = section
             'Секция конфига, отображаемая в Config.config.'
 
@@ -74,9 +74,9 @@ class _Config:
         if not section_names: section_names = [config_path.stem.upper()]
 
         for section_name in section_names:
-            if _Config.__settings_files.get(section_name, None): raise ValueError('Конфиг с указанным именем секции уже существует!')
+            if Config.__settings_files.get(section_name, None): raise ValueError('Конфиг с указанным именем секции уже существует!')
 
-            _Config.__settings_files[section_name] = config_path
+            Config.__settings_files[section_name] = config_path
 
 
         return
@@ -131,8 +131,8 @@ class _Config:
     def __save_without_section(self):
         config_paths_sections: dict[Path, list[str]] = {}
 
-        for section_name in _Config.__settings_files:
-            config_path = _Config.__settings_files[section_name]
+        for section_name in Config.__settings_files:
+            config_path = Config.__settings_files[section_name]
 
             config_paths_sections[config_path] = list(set(config_paths_sections.get(config_path, []) + [section_name]))
 
@@ -150,7 +150,7 @@ class _Config:
 
 
     def __save_with_section(self):
-        config_file_path: Path = _Config.__settings_files[self.__section]
+        config_file_path: Path = Config.__settings_files[self.__section]
 
         sections_to_save: list[str] = self.__get_same_config_file_sections()
 
@@ -189,13 +189,13 @@ class _Config:
         if not self.__section: return None
 
 
-        config_file_path: Path = _Config.__settings_files[self.__section]
+        config_file_path: Path = Config.__settings_files[self.__section]
 
 
         sections: list[str] = []
 
-        for section_name in _Config.__settings_files:
-            if self.__section != section_name and _Config.__settings_files[section_name] == config_file_path: sections.append(config_file_path)
+        for section_name in Config.__settings_files:
+            if self.__section != section_name and Config.__settings_files[section_name] == config_file_path: sections.append(config_file_path)
 
 
         return sections
@@ -206,35 +206,35 @@ class _Config:
         '''
         Список уникальных путей в Config.__settings_files.
         '''
-        return list(set(list(_Config.__settings_files.values())))
+        return list(set(list(Config.__settings_files.values())))
 
 
     def __get_lock(self):
         '''
         Возвращает Lock для указанной секции конфига.
         '''
-        if not self.__section: return _Config.__locks['default_lock']
+        if not self.__section: return Config.__locks['default_lock']
 
 
-        if _Config.__locks.get(self.__section): return _Config.__locks.get(self.__section)
+        if Config.__locks.get(self.__section): return Config.__locks.get(self.__section)
 
 
         sections =  self.__get_same_config_file_sections()
 
         if not sections:
-            _Config.__locks[self.__section] = Lock()
+            Config.__locks[self.__section] = Lock()
 
-            return _Config.__locks.get(self.__section)
+            return Config.__locks.get(self.__section)
 
 
         for section in sections:
-            if _Config.__locks.get(section):
-                _Config.__locks[self.__section] = _Config.__locks.get(section)
+            if Config.__locks.get(section):
+                Config.__locks[self.__section] = Config.__locks.get(section)
 
-                return _Config.__locks.get(self.__section)
+                return Config.__locks.get(self.__section)
 
 
         
-        _Config.__locks[self.__section] = Lock()
+        Config.__locks[self.__section] = Lock()
 
-        return _Config.__locks.get(self.__section)
+        return Config.__locks.get(self.__section)

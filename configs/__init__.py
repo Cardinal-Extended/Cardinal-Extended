@@ -28,7 +28,7 @@ from .config import *
 
 
 # ------------------------ Кастомные пути и директории ----------------------- #
-__paths_config = _Config('PATHS')
+__paths_config = Config('PATHS')
 
 for __config_path_name in __paths_config.config: globals()[__config_path_name] = HOME_DIR.joinpath(str(__paths_config.config[__config_path_name]))
 
@@ -39,7 +39,7 @@ __all__ = [
     'LOGGER_CONFIG_PATH',
     'PATHS_CONFIG_PATH',
     'VERSION_PATH',
-    '_Config',
+    'Config',
     'SETTINGS_PATH',
 ]
 

@@ -7,7 +7,7 @@ from Utils import (
 )
 
 
-from configs import CONFIGS_DIR, _Config, DEFAULT_CARDINAL_CONFIG_PATH
+from configs import CONFIGS_DIR, Config, DEFAULT_CARDINAL_CONFIG_PATH
 
 
 import importlib.util
@@ -125,16 +125,16 @@ class CardinalManager(CardinalManagerABC):
             config_path = CONFIGS_DIR / f'{name}.toml'
             config_path.write_text(f'[{name}]', 'utf-8')
 
-            _Config.add_config_file(config_path, [name])
+            Config.add_config_file(config_path, [name])
 
 
-            config = _Config(name)
+            config = Config(name)
 
 
-            if not _Config().config.get('DEFAULT_CARDINAL_CONFIG'):
-                _Config.add_config_file(DEFAULT_CARDINAL_CONFIG_PATH, ['DEFAULT_CARDINAL_CONFIG'])
+            if not Config().config.get('DEFAULT_CARDINAL_CONFIG'):
+                Config.add_config_file(DEFAULT_CARDINAL_CONFIG_PATH, ['DEFAULT_CARDINAL_CONFIG'])
 
-            default_config = _Config('DEFAULT_CARDINAL_CONFIG')
+            default_config = Config('DEFAULT_CARDINAL_CONFIG')
 
 
             config.config = default_config.config
@@ -150,7 +150,7 @@ class CardinalManager(CardinalManagerABC):
             return
 
 
-        if not _Config().config.get(name): _Config.add_config_file(config_path, [name])
+        if not Config().config.get(name): Config.add_config_file(config_path, [name])
 
 
         return

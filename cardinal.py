@@ -14,7 +14,7 @@ from Utils import (
 )
 
 
-from configs import _Config, VERSION_PATH
+from configs import Config, VERSION_PATH
 
 
 from FunPayAPI.common import EventTypes, SubCategoryTypes, Currencies # TODO FunPayAPI.__init__.py
@@ -1099,7 +1099,7 @@ class Cardinal:
     #                                   Настройки                                  #
     # ---------------------------------------------------------------------------- #
     @property
-    def config(self): return _Config(self.name)
+    def config(self): return Config(self.name)
 
 
     @property
