@@ -20,10 +20,9 @@ import re
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from . import types
-from .common import exceptions
 
 
-from .common import MessageTypes, OrderStatuses, SubCategoryTypes, Currencies, Wallets, Months, generate_random_tag, PRODUCTS_AMOUNT_RE, EXCHANGE_RATE_RE
+from . import exceptions, MessageTypes, OrderStatuses, SubCategoryTypes, Currencies, Wallets, Months, generate_random_tag, PRODUCTS_AMOUNT_RE, EXCHANGE_RATE_RE
 
 
 logger = logging.getLogger("FunPayAPI.account")

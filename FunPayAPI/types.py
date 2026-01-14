@@ -7,7 +7,7 @@ import re
 from typing import Literal, overload, Optional
 
 
-from .common import MessageTypes, OrderStatuses, SubCategoryTypes, Currencies, PRODUCTS_AMOUNT_RE # TODO FunPayAPI.__init__.py
+from . import MessageTypes, OrderStatuses, SubCategoryTypes, Currencies, PRODUCTS_AMOUNT_RE
 
 
 import datetime

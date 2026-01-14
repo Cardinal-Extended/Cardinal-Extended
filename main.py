@@ -6,12 +6,11 @@ import os
 from cardinal_manager import CardinalManager
 
 
-from configs import VERSION_PATH, PLUGINS_DIR, LOGS_DIR, STORAGE_DIR, CACHE_DIR, UPDATE_DIR, LOGGER_CONFIG_PATH
+from configs import VERSION_PATH, PLUGINS_DIR, LOGS_DIR, STORAGE_DIR, CACHE_DIR, UPDATE_DIR, Config
 
 from Utils import set_console_title
 
 
-import tomllib
 import logging.config
 import colorama
 import time
@@ -37,9 +36,9 @@ for folder in folders:
 colorama.init()
 
 
-logger_config = tomllib.load(LOGGER_CONFIG_PATH.open('rb'))
+logger_config: dict = Config().LOGGER.to_dict()
 
-logging.config.dictConfig(logger_config['LOGGER'])
+logging.config.dictConfig(logger_config)
 
 logging.raiseExceptions = False
 

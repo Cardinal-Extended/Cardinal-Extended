@@ -10,11 +10,10 @@ import json
 import logging
 from bs4 import BeautifulSoup
 
-from ..common import exceptions
 from .events import *
 
 
-from ..common import OrderStatuses, generate_random_tag # TODO FunPayAPI.__init__.py
+from .. import exceptions, OrderStatuses, generate_random_tag
 
 
 logger = logging.getLogger("FunPayAPI.runner")

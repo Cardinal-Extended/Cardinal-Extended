@@ -256,6 +256,10 @@ EXCHANGE_RATE_RE = re.compile(
 Доступные группы match: currency_to, exchange_rate_currency_from, currency_from_symbol, exchange_rate_currency_to, currency_to_symbol.
 '''
 
+
+from . import exceptions
+
+
 from .types import *
 
 
@@ -285,5 +289,6 @@ __all__ = [
     'SubCategoryTypes',
     'Currencies',
     'Wallets',
-    'Months'
+    'Months',
+    'exceptions'
 ]

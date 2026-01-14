@@ -2,7 +2,7 @@ from __future__ import annotations
 import time
 from .. import types
 
-from ..common import EventTypes, generate_random_tag
+from .. import EventTypes, generate_random_tag
 
 
 class BaseEvent:

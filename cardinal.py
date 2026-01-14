@@ -17,7 +17,7 @@ from Utils import (
 from configs import Config, VERSION_PATH
 
 
-from FunPayAPI.common import EventTypes, SubCategoryTypes, Currencies # TODO FunPayAPI.__init__.py
+from FunPayAPI import EventTypes, SubCategoryTypes, Currencies
 
 
 import FunPayAPI
@@ -132,10 +132,10 @@ class Cardinal:
         self.event_var_names = [
             'PRE_INIT', # Функции, выполняемые до инициализации Кардинала (после загрузки плагинов).
             'POST_INIT', # Функции, выполняемые после инициализации Кардинала.
-            'PRE_START', # Функции, выполняемые перед запуском кардинала (выполняются первыми).
-            'POST_START', # Функции, выполняемые перед запуском кардинала (после PRE_START).
-            'PRE_STOP', # Функции, выполняемые при остановке кардинала (выполняются первыми).
-            'POST_STOP', # Функции, выполняемые при остановке кардинала (после PRE_STOP).
+            'PRE_START', # Функции, выполняемые перед запуском Кардинала (выполняются первыми).
+            'POST_START', # Функции, выполняемые перед запуском Кардинала (после PRE_START).
+            'PRE_STOP', # Функции, выполняемые при остановке Кардинала (выполняются первыми).
+            'POST_STOP', # Функции, выполняемые при остановке Кардинала (после PRE_STOP).
             'INITIAL_CHAT', # Функции, выполняемые при получении чата при запуске раннера.
             'CHATS_LIST_CHANGED', # Функции, выполняемые при изменении списка чатов или последнего сообщения любого из чатов.
             'LAST_CHAT_MESSAGE_CHANGED', # Функции, выполняемые при изменении последнего сообщения в чате.
