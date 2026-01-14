@@ -6,7 +6,7 @@ from . import LOCALES_DIR, ARG_PATTERN, KWARG_PATTERN
 from .exceptions import *
 
 
-from typing import Literal
+from typing import Literal, Self
 import json
 
 
@@ -20,7 +20,9 @@ log = logging.getLogger('Localizer')
 
 
 class Localizer:
-    instance = None
+    instance: Self = None
+
+
     def __new__(cls):
         if not cls.instance: cls.instance = super().__new__(cls)
 

@@ -6,10 +6,9 @@ import os
 from cardinal_manager import CardinalManager
 
 
-from configs import LOGGER_CONFIG_PATH
+from configs import VERSION_PATH, PLUGINS_DIR, LOGS_DIR, STORAGE_DIR, CACHE_DIR, UPDATE_DIR, LOGGER_CONFIG_PATH
 
-from Utils import PLUGIN_DIR, LOGS_DIR, STORAGE_DIR, CACHE_DIR, UPDATE_DIR, VERSION
-import Utils.cardinal_tools
+from Utils import set_console_title
 
 
 import tomllib
@@ -18,7 +17,10 @@ import colorama
 import time
 
 
-Utils.cardinal_tools.set_console_title(f'Cardinal Extended {VERSION}')
+VERSION = VERSION_PATH.read_text('utf-8')
+
+
+set_console_title(f'Cardinal Extended {VERSION}')
 
 
 if getattr(sys, 'frozen', False): os.chdir(os.path.dirname(sys.executable))
@@ -26,16 +28,22 @@ if getattr(sys, 'frozen', False): os.chdir(os.path.dirname(sys.executable))
 else: os.chdir(os.path.dirname(__file__))
 
 
-folders = [PLUGIN_DIR, LOGS_DIR, STORAGE_DIR, CACHE_DIR, UPDATE_DIR]
+folders = [PLUGINS_DIR, LOGS_DIR, STORAGE_DIR, CACHE_DIR, UPDATE_DIR]
+
 for folder in folders:
     if not folder.exists(): folder.mkdir(parents=True, exist_ok=True)
 
 
 colorama.init()
 
-with open(LOGGER_CONFIG_PATH, 'rb') as fp: logger_config = tomllib.load(fp)
-logging.config.dictConfig(logger_config)
+
+logger_config = tomllib.load(LOGGER_CONFIG_PATH.open('rb'))
+
+logging.config.dictConfig(logger_config['LOGGER'])
+
 logging.raiseExceptions = False
+
+
 log = logging.getLogger('main')
 
 
@@ -84,7 +92,7 @@ try:
 
     manager = CardinalManager()
 
-    manager.start_cardinal('Cardinal', VERSION)
+    manager.start_cardinal('CARDINAL', VERSION)
 
     manager.loop()
 

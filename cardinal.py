@@ -10,12 +10,11 @@ if TYPE_CHECKING: from importlib._bootstrap import ModuleSpec
 
 
 from Utils import (
-    ENTITY_RE, exceptions, check_proxy, set_console_title, Plugin, Handler, get_new_releases, CheckUpdatesResponses, CardinalManager, Release, CheckUpdatesResponse,
-    VERSION_PATH
+    ENTITY_RE, exceptions, check_proxy, set_console_title, Plugin, Handler, get_new_releases, CheckUpdatesResponses, CardinalManager, Release, CheckUpdatesResponse
 )
 
 
-from configs import Config
+from configs import _Config, VERSION_PATH
 
 
 from FunPayAPI.common import EventTypes, SubCategoryTypes, Currencies # TODO FunPayAPI.__init__.py
@@ -1100,11 +1099,11 @@ class Cardinal:
     #                                   Настройки                                  #
     # ---------------------------------------------------------------------------- #
     @property
-    def config(self): return Config(self.name)
+    def config(self): return _Config(self.name)
 
 
     @property
-    def __cardinal_package_version(self) -> str:
+    def __cardinal_package_version(self) -> str: # TODO move to Utils
         'Текущая версия программы.'
         with open(VERSION_PATH, 'r') as fp:
             result = fp.read()

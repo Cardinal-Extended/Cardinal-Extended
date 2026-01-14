@@ -1,17 +1,13 @@
-[Cardinal]
+[DEFAULT_CARDINAL_CONFIG]
     language = "en" # Cardinal's language (logs, etc.)
 
-    check_for_updates = true # Automatically check for Cardinal updates on GitHub
-    check_for_updates_delay = 600 # Delay in seconds
-    auto_update = false # Automatically update Cardinal from GitHub
 
-
-    [Cardinal.plugins]
+    [DEFAULT_CARDINAL_CONFIG.plugins]
         load_all_plugins = false
         trusted_plugins = [] # If load_all_plugins = false, load only these plugins
 
 
-    [Cardinal.proxy]
+    [DEFAULT_CARDINAL_CONFIG.proxy]
         enable = false # Use proxy for FunPay requests
 
         ip = ""
@@ -22,7 +18,7 @@
         check = false # Check proxy
 
 
-    [Cardinal.FunPay]
+    [DEFAULT_CARDINAL_CONFIG.FunPay]
         golden_key = "" # Session token FunPay
         user_agent = "" # Browser user-agent
 
@@ -32,7 +28,7 @@
         keepSentMessagesUnread = false
 
 
-    [Cardinal.Other]
+    [DEFAULT_CARDINAL_CONFIG.Other]
         requestsDelay = 4 # FunPay runner's requests delay
 
 

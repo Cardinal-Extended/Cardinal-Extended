@@ -12,7 +12,7 @@ __all__ = [
 ]
 
 
-class ColoredFormatter(Formatter):
+class ColoredFormatter(Formatter): # TODO colorama only
     def __init__(self):
         super(ColoredFormatter, self).__init__(datefmt='%Y-%m-%d %H:%M:%S')
         self.log_level_colors = {'DEBUG': '\033[94m', 'INFO': '\033[92m', 'WARNING': '\033[93m', 'ERROR': '\033[91m', 'CRITICAL': '\033[95m'}
@@ -52,7 +52,7 @@ class ColoredFormatter(Formatter):
         return super().format(record)
 
 
-class FileFormatter(Formatter):
+class FileFormatter(Formatter): # TODO colorama only
     def __init__(self):
         super().__init__(
             fmt='%(name)s: [%(levelname)s: %(asctime)s] %(message)s',

@@ -1501,13 +1501,13 @@ class Account:
                 day, month = split[0].split()
                 day, month = int(day), Months[month]
                 h, m = split[1].split(":")
-                order_date = datetime(now.year, month, day, int(h), int(m))
+                order_date = datetime(now.year, month.value, day, int(h), int(m))
             else:  # ДД месяца ГГГГ, ЧЧ:ММ
                 split = order_date_text.split(", ")
                 day, month, year = split[0].split()
                 day, month, year = int(day), Months[month], int(year)
                 h, m = split[1].split(":")
-                order_date = datetime(year, month, day, int(h), int(m))
+                order_date = datetime(year, month.value, day, int(h), int(m))
             id1, id2 = sorted([buyer_id, self.id])
             chat_id = f"users-{id1}-{id2}"
             order_obj = types.OrderShortcut(order_id, description, price, currency, buyer_username, buyer_id, chat_id,

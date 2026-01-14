@@ -3,10 +3,10 @@ import shutil
 
 
 from . import (
-    GITHUB_TAGS_URL, GITHUB_RELEASES_URL, Release, CheckUpdatesResponses, InstallUpdateResponses, CACHE_DIR, UPDATE_DIR, BACKUP_DIR, STORAGE_DIR, PLUGIN_DIR, exceptions,
+    GITHUB_TAGS_URL, GITHUB_RELEASES_URL, Release, CheckUpdatesResponses, InstallUpdateResponses, exceptions,
     CheckUpdatesResponse
 )
-from configs import CONFIGS_DIR
+from configs import CONFIGS_DIR, STORAGE_DIR, PLUGINS_DIR, CACHE_DIR, UPDATE_DIR, BACKUP_DIR
 
 
 import requests
@@ -16,7 +16,6 @@ from zipfile import ZipFile
 from pathlib import Path
 from time import sleep
 import json
-from typing import Any
 
 
 __all__ = [
@@ -246,7 +245,7 @@ def create_backup() -> None:
     with ZipFile("backup.zip", "w") as zip:
         zipdir(STORAGE_DIR, zip)
         zipdir(CONFIGS_DIR, zip)
-        zipdir(PLUGIN_DIR, zip)
+        zipdir(PLUGINS_DIR, zip)
 
 
     return

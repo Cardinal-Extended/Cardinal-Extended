@@ -6,6 +6,10 @@ from Utils import (
     CardinalManager as CardinalManagerABC, Release, create_backup, create_backup, download_zip, extract_update_archive, install_release, InstallUpdateResponses
 )
 
+
+from configs import CONFIGS_DIR, _Config, DEFAULT_CARDINAL_CONFIG_PATH
+
+
 import importlib.util
 
 
@@ -97,6 +101,9 @@ class CardinalManager(CardinalManagerABC):
         if self.get_cardinal(name): raise ValueError('Кардинал уже инициализирован!')
 
 
+        self.__set_cardinal_config(name)
+
+
         cardinal: Cardinal = self.get_actual_cardinal_package().Cardinal(name, version)
 
         self.cardinals[name] = cardinal
@@ -109,6 +116,44 @@ class CardinalManager(CardinalManagerABC):
 
         self.cardinal_running_thread = Thread(target=cardinal.start, daemon=True)
         self.cardinal_running_thread.start()
+
+
+    def __set_cardinal_config(self, name: str):
+        config_path = CONFIGS_DIR / f'{name}.toml'
+
+        if not config_path.exists():
+            config_path = CONFIGS_DIR / f'{name}.toml'
+            config_path.write_text(f'[{name}]', 'utf-8')
+
+            _Config.add_config_file(config_path, [name])
+
+
+            config = _Config(name)
+
+
+            if not _Config().config.get('DEFAULT_CARDINAL_CONFIG'):
+                _Config.add_config_file(DEFAULT_CARDINAL_CONFIG_PATH, ['DEFAULT_CARDINAL_CONFIG'])
+
+            default_config = _Config('DEFAULT_CARDINAL_CONFIG')
+
+
+            config.config = default_config.config
+
+
+            config.config.check_for_updates = True
+            config.config.check_for_updates_delay = 600
+            config.config.auto_update = False
+
+            config.save()
+
+
+            return
+
+
+        if not _Config().config.get(name): _Config.add_config_file(config_path, [name])
+
+
+        return
 
 
     def stop_cardinal(self, name: str):

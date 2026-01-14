@@ -1,5 +1,8 @@
 
-configs/settings.toml
+configs/*.toml
+!configs/default_cardinal_config.toml
+!configs/logger_config.toml
+!configs/paths.toml
 
 plugins
 logs

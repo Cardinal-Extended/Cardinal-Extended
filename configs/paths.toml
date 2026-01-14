@@ -1,0 +1,7 @@
+[PATHS]
+PLUGINS_DIR = "plugins"
+STORAGE_DIR = "storage"
+CACHE_DIR = "storage/cache"
+UPDATE_DIR = "storage/cache/update"
+BACKUP_DIR = "storage/cache/backup"
+DEFAULT_CARDINAL_CONFIG_PATH = "configs/default_cardinal_config.toml"
