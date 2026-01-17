@@ -3,7 +3,7 @@ from __future__ import annotations
 
 
 from typing import TYPE_CHECKING
-if TYPE_CHECKING: from ..types import Category
+if TYPE_CHECKING: from .. import Category
 
 
 import requests

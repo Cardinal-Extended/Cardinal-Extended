@@ -17,11 +17,10 @@ from Utils import (
 from configs import Config, VERSION_PATH
 
 
-from FunPayAPI import EventTypes, SubCategoryTypes, Currencies
+from FunPayAPI import EventTypes, SubCategoryTypes, Currencies, Message, LotShortcut, UserProfile, Balance
 
 
 import FunPayAPI
-from FunPayAPI.types import LotShortcut
 
 
 import json
@@ -111,10 +110,10 @@ class Cardinal:
         self.runner: FunPayAPI.Runner | None = None
         'Runner.'
 
-        self.profile: FunPayAPI.types.UserProfile | None = None
+        self.profile: UserProfile | None = None
         'Профиль FunPay'
 
-        self.balance: FunPayAPI.types.Balance | None = None
+        self.balance: Balance | None = None
         'Баланс аккаунта FunPay.'
 
 
@@ -326,7 +325,7 @@ class Cardinal:
             return False
 
 
-    def get_balance(self, attempts: int = 3) -> FunPayAPI.types.Balance:
+    def get_balance(self, attempts: int = 3) -> Balance:
         log.info(self.__translate('c_ext_getting_balance'))
 
         subcategories = self.account.get_sorted_subcategories()[SubCategoryTypes.COMMON]
@@ -424,9 +423,9 @@ class Cardinal:
             return False
 
 
-        self.lot_shortcuts = self.profile.get_lots()
+        self.lot_shortcuts = self.profile.lots
         self.lot_ids = [i.id for i in self.lot_shortcuts]
-        log.info(self.__translate('c_ext_profile_updated', len(self.lot_shortcuts), len(self.profile.get_sorted_lots(2))))
+        log.info(self.__translate('c_ext_profile_updated', len(self.lot_shortcuts), len(self.profile.sorted_by_subcategory_lots)))
 
 
         self.run_handlers(self.handlers.get('PROFILE_UPDATE_SUCCESS', []))
@@ -963,7 +962,7 @@ class Cardinal:
     # ---------------------------------------------------------------------------- #
     def send_message(self, chat_id: int | str, message_text: str, chat_name: str | None = None,
                      interlocutor_id: int | None = None, attempts: int = 3,
-                     watermark: bool = True) -> list[FunPayAPI.types.Message] | None:
+                     watermark: bool = True) -> list[Message] | None:
         '''
         Отправляет сообщение в чат FunPay.
 

@@ -263,6 +263,25 @@ from . import exceptions
 from .types import *
 
 
+def get_message_type_by_re(text: str) -> MessageTypes:
+    '''
+    Возвращает тип сообщения на основе регулярных выражений.
+
+    :param text: Текст сообщения.
+    :type text: str
+    :return: Тип сообщения.
+    :rtype: MessageTypes
+    '''
+    for message_type in MessageTypes:
+        if message_type is MessageTypes.NON_SYSTEM: continue
+
+
+        if message_type.value.search(text): return message_type
+
+
+    return MessageTypes.NON_SYSTEM
+
+
 __all__ = [
     'generate_random_tag',
     'ORDER_ID_RE',
@@ -283,6 +302,7 @@ __all__ = [
     'DISCORD_RE',
     'DEAR_VENDORS_RE',
     'EXCHANGE_RATE_RE',
+    'exceptions',
     'EventTypes',
     'MessageTypes',
     'OrderStatuses',
@@ -290,5 +310,25 @@ __all__ = [
     'Currencies',
     'Wallets',
     'Months',
-    'exceptions'
+    'BuyerViewing',
+    'ChatShortcut',
+    'Chat',
+    'Message',
+    'OrderShortcut',
+    'Order',
+    'Category',
+    'SubCategory',
+    'LotFields',
+    'ChipOffer',
+    'ChipFields',
+    'LotPage',
+    'SellerShortcut',
+    'LotShortcut',
+    'MyLotShortcut',
+    'UserProfile',
+    'Review',
+    'Balance',
+    'PaymentMethod',
+    'CalcResult',
+    'get_message_type_by_re'
 ]

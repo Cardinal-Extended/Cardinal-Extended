@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from typing import TYPE_CHECKING, Generator
 
 if TYPE_CHECKING:
@@ -13,7 +12,12 @@ from bs4 import BeautifulSoup
 from .events import *
 
 
-from .. import exceptions, OrderStatuses, generate_random_tag
+from .. import exceptions, OrderStatuses, generate_random_tag, BuyerViewing, ChatShortcut, OrderShortcut
+
+
+__all__ = [
+    'Runner'
+]
 
 
 logger = logging.getLogger("FunPayAPI.runner")
@@ -61,8 +65,8 @@ class Runner:
         self.__last_msg_event_tag = generate_random_tag()
         self.__last_order_event_tag = generate_random_tag()
 
-        self.saved_orders: dict[str, types.OrderShortcut] = {}
-        """Сохраненные состояния заказов ({ID заказа: экземпляр types.OrderShortcut})."""
+        self.saved_orders: dict[str, OrderShortcut] = {}
+        """Сохраненные состояния заказов ({ID заказа: экземпляр OrderShortcut})."""
 
         self.runner_last_messages: dict[int, list[int, int, str | None]] = {}
         """ID последний сообщений {ID чата: [ID последего сообщения чата, ID последнего прочитанного сообщения чата, 
@@ -74,7 +78,7 @@ class Runner:
         self.last_messages_ids: dict[int, int] = {}
         """ID последних сообщений в чатах ({ID чата: ID последнего сообщения})."""
 
-        self.buyers_viewing: dict[int, types.BuyerViewing] = {}
+        self.buyers_viewing: dict[int, BuyerViewing] = {}
         """Что смотрит покупатель? ({ID покупателя: что смотрит}"""
 
         self.runner_len: int = 10
@@ -184,9 +188,6 @@ class Runner:
             if last_msg_text.startswith(self.account.bot_character):
                 last_msg_text = last_msg_text[1:]
                 by_bot = True
-            elif last_msg_text.startswith(self.account.old_bot_character):
-                last_msg_text = last_msg_text[1:]
-                by_vertex = True
             # если сообщение отправлено непрочитанным и вкл старый режим, то [0, 0, None] или [0, 0, "text"]
             prev_node_msg_id, prev_user_msg_id, prev_text = self.runner_last_messages.get(chat_id) or [-1, -1, None]
             last_msg_text_or_none = None if last_msg_text in ("Изображение", "Зображення", "Image") else last_msg_text
@@ -199,11 +200,7 @@ class Runner:
             unread = True if "unread" in chat.get("class") else False
 
             chat_with = chat.find("div", {"class": "media-user-name"}).text
-            chat_obj = types.ChatShortcut(chat_id, chat_with, last_msg_text, node_msg_id,
-                                          user_msg_id, unread, str(chat))
-            if last_msg_text_or_none is not None:
-                chat_obj.last_by_bot = by_bot
-                chat_obj.last_by_vertex = by_vertex
+            chat_obj = ChatShortcut(chat_id, chat_with, last_msg_text, node_msg_id, user_msg_id, unread, str(chat), by_bot if last_msg_text_or_none is not None else None)
 
             self.account.add_chats([chat_obj])
             self.runner_last_messages[chat_id] = [node_msg_id, user_msg_id, last_msg_text_or_none]

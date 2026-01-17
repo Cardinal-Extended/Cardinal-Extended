@@ -1,8 +1,7 @@
 from __future__ import annotations
 import time
-from .. import types
 
-from .. import EventTypes, generate_random_tag
+from .. import EventTypes, generate_random_tag, ChatShortcut, Message, OrderShortcut
 
 
 class BaseEvent:
@@ -32,11 +31,11 @@ class InitialChatEvent(BaseEvent):
     :type runner_tag: :obj:`str`
 
     :param chat_obj: объект обнаруженного чата.
-    :type chat_obj: :class:`FunPayAPI.types.ChatShortcut`
+    :type chat_obj: ChatShortcut
     """
-    def __init__(self, runner_tag: str, chat_obj: types.ChatShortcut):
+    def __init__(self, runner_tag: str, chat_obj: ChatShortcut):
         super(InitialChatEvent, self).__init__(runner_tag, EventTypes.INITIAL_CHAT)
-        self.chat: types.ChatShortcut = chat_obj
+        self.chat: ChatShortcut = chat_obj
         """Объект обнаруженного чата."""
 
 
@@ -60,11 +59,11 @@ class LastChatMessageChangedEvent(BaseEvent):
     :type runner_tag: :obj:`str`
 
     :param chat_obj: объект чата, в котором изменилось последнее сообщение.
-    :type chat_obj: :class:`FunPayAPI.types.ChatShortcut`
+    :type chat_obj: ChatShortcut
     """
-    def __init__(self, runner_tag: str, chat_obj: types.ChatShortcut):
+    def __init__(self, runner_tag: str, chat_obj: ChatShortcut):
         super(LastChatMessageChangedEvent, self).__init__(runner_tag, EventTypes.LAST_CHAT_MESSAGE_CHANGED)
-        self.chat: types.ChatShortcut = chat_obj
+        self.chat: ChatShortcut = chat_obj
         """Объект чата, в котором изменилось последнее сообщение."""
 
 
@@ -76,14 +75,14 @@ class NewMessageEvent(BaseEvent):
     :type runner_tag: :obj:`str`
 
     :param message_obj: объект нового сообщения.
-    :type message_obj: :class:`FunPayAPI.types.Message`
+    :type message_obj: Message
 
     :param stack: объект стэка событий новых собщений.
     :type stack: :class:`FunPayAPI.updater.events.MessageEventsStack` or :obj:`None`, опционально
     """
-    def __init__(self, runner_tag: str, message_obj: types.Message, stack: MessageEventsStack | None = None):
+    def __init__(self, runner_tag: str, message_obj: Message, stack: MessageEventsStack | None = None):
         super(NewMessageEvent, self).__init__(runner_tag, EventTypes.NEW_MESSAGE)
-        self.message: types.Message = message_obj
+        self.message: Message = message_obj
         """Объект нового сообщения."""
         self.stack: MessageEventsStack = stack
         """Объект стэка событий новых сообщений."""
@@ -134,11 +133,11 @@ class InitialOrderEvent(BaseEvent):
     :type runner_tag: :obj:`str`
 
     :param order_obj: объект обнаруженного заказа.
-    :type order_obj: :class:`FunPayAPI.types.OrderShortcut`
+    :type order_obj: OrderShortcut
     """
-    def __init__(self, runner_tag: str, order_obj: types.OrderShortcut):
+    def __init__(self, runner_tag: str, order_obj: OrderShortcut):
         super(InitialOrderEvent, self).__init__(runner_tag, EventTypes.INITIAL_ORDER)
-        self.order: types.OrderShortcut = order_obj
+        self.order: OrderShortcut = order_obj
         """Объект обнаруженного заказа."""
 
 
@@ -171,11 +170,11 @@ class NewOrderEvent(BaseEvent):
     :type runner_tag: :obj:`str`
 
     :param order_obj: объект нового заказа.
-    :type order_obj: :class:`FunPayAPI.types.OrderShortcut`
+    :type order_obj: OrderShortcut
     """
-    def __init__(self, runner_tag: str, order_obj: types.OrderShortcut):
+    def __init__(self, runner_tag: str, order_obj: OrderShortcut):
         super(NewOrderEvent, self).__init__(runner_tag, EventTypes.NEW_ORDER)
-        self.order: types.OrderShortcut = order_obj
+        self.order: OrderShortcut = order_obj
         """Объект нового заказа."""
 
 
@@ -187,9 +186,9 @@ class OrderStatusChangedEvent(BaseEvent):
     :type runner_tag: :obj:`str`
 
     :param order_obj: объект измененного заказа.
-    :type order_obj: :class:`FunPayAPI.types.OrderShortcut`
+    :type order_obj: OrderShortcut
     """
-    def __init__(self, runner_tag: str, order_obj: types.OrderShortcut):
+    def __init__(self, runner_tag: str, order_obj: OrderShortcut):
         super(OrderStatusChangedEvent, self).__init__(runner_tag, EventTypes.ORDER_STATUS_CHANGED)
-        self.order: types.OrderShortcut = order_obj
+        self.order: OrderShortcut = order_obj
         """Объект измененного заказа."""
