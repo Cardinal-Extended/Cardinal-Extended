@@ -1,22 +1,11 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Literal, Any, Optional, IO
+
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .updater.runner import Runner
-
-from requests_toolbelt import MultipartEncoder
-from bs4 import BeautifulSoup
-from datetime import datetime, timedelta
-import requests
-import logging
-import random
-import string
-import json
-import time
-import re
-
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
+    from .runner import Runner
+    from requests import Response
 
 
 from . import (
@@ -26,12 +15,30 @@ from . import (
 )
 
 
+from requests import Session
+from requests.adapters import HTTPAdapter
+from requests.exceptions import JSONDecodeError
+from requests_toolbelt import MultipartEncoder
+from urllib3.util.retry import Retry
+from bs4 import BeautifulSoup
+
+
+from datetime import datetime, timedelta
+from logging import getLogger
+import random
+import string
+import json
+from time import time, sleep
+import re
+from typing import Literal, Any, Optional, IO
+
+
 __all__ = [
     'Account'
 ]
 
 
-logger = logging.getLogger("FunPayAPI.account")
+logger = getLogger("FunPayAPI.account")
 PRIVATE_CHAT_ID_RE = re.compile(r"users-\d+-\d+$")
 
 
@@ -52,7 +59,7 @@ class Account:
     :type proxy: :obj:`dict` {:obj:`str`: :obj:`str` or :obj:`None`
 
     :param locale: текущий язык аккаунта, опционально.
-    :type locale: :obj:`Literal["ru", "en", "uk"]` or :obj:`None`
+    :type locale: str | None
     """
 
     def __init__(self, golden_key: str, user_agent: str | None = None,
@@ -133,7 +140,7 @@ class Account:
         """Если сообщение начинается с этого символа, значит оно отправлено ботом."""
         self.__old_bot_character = "⁤"
         """Старое значение self.__bot_character, для корректной маркировки отправки ботом старых сообщений"""
-        self.session = requests.Session()
+        self.session = Session()
         retry_strategy = Retry(
             total=6,
             connect=6,
@@ -149,7 +156,7 @@ class Account:
 
     def method(self, request_method: Literal["post", "get"], api_method: str, headers: dict, payload: Any,
                exclude_phpsessid: bool = False, raise_not_200: bool = False,
-               locale: Literal["ru", "en", "uk"] | None = None) -> requests.Response:
+               locale: Literal["ru", "en", "uk"] | None = None) -> Response:
         """
         Отправляет запрос к FunPay. Добавляет в заголовки запроса user_agent и куки.
 
@@ -172,7 +179,7 @@ class Account:
         :type raise_not_200: :obj:`bool`
 
         :return: объект ответа.
-        :rtype: :class:`requests.Response`
+        :rtype: Response
         """
 
         def normalize_url(api_method: str, locale: Literal["ru", "en", "uk"] | None = None) -> str:
@@ -216,8 +223,8 @@ class Account:
             i += 1
             response = self.session.request(url=link, data=payload, allow_redirects=False, **kwargs)
             if response.status_code == 429:
-                self.last_429_err_time = time.time()
-                time.sleep(min(2 ** i, 30))
+                self.last_429_err_time = time()
+                sleep(min(2 ** i, 30))
                 continue
             elif not (300 <= response.status_code < 400) or 'Location' not in response.headers:
                 break
@@ -278,7 +285,7 @@ class Account:
         if not self.is_initiated:
             self.__setup_categories(html_response)
 
-        self.last_update = int(time.time())
+        self.last_update = int(time())
         self.html = html_response
         self.__initiated = True
         return self
@@ -700,7 +707,7 @@ class Account:
                 json_response = response.json()
                 message = json_response.get("msg")
                 raise exceptions.ImageUploadError(response, message)
-            except requests.exceptions.JSONDecodeError:
+            except JSONDecodeError:
                 raise exceptions.ImageUploadError(response, None)
         elif response.status_code != 200:
             raise exceptions.RequestFailedError(response)
@@ -785,11 +792,11 @@ class Account:
             if error_text in ("Нельзя отправлять сообщения слишком часто.",
                               "You cannot send messages too frequently.",
                               "Не можна надсилати повідомлення занадто часто."):
-                self.last_flood_err_time = time.time()
+                self.last_flood_err_time = time()
             elif error_text in ("Нельзя слишком часто отправлять сообщения разным пользователям.",
                                 "Не можна надто часто надсилати повідомлення різним користувачам.",
                                 "You cannot message multiple users too frequently."):
-                self.last_multiuser_flood_err_time = time.time()
+                self.last_multiuser_flood_err_time = time()
             raise exceptions.MessageNotDeliveredError(response, error_text, chat_id)
         if leave_as_unread:
             message_text = text
@@ -1471,15 +1478,23 @@ class Account:
         return order
 
 
-    def get_sales(self, start_from: str | None = None, include_paid: bool = True, include_closed: bool = True,
-                  include_refunded: bool = True, exclude_ids: list[str] | None = None,
-                  id: Optional[str] = None, buyer: Optional[str] = None,
-                  state: Optional[Literal["closed", "paid", "refunded"]] = None, game: Optional[int] = None,
-                  section: Optional[str] = None, server: Optional[int] = None,
-                  side: Optional[int] = None, locale: Literal["ru", "en", "uk"] | None = None,
-                  subcategories: dict[str, tuple[SubCategoryTypes, int]] | None = None, **more_filters) -> \
-            tuple[str | None, list[OrderShortcut], Literal["ru", "en", "uk"],
-            dict[str, SubCategory]]:
+    def get_sales(
+            self,
+            start_from: str | None = None,
+            include_paid: bool = True,include_closed: bool = True,
+            include_refunded: bool = True,
+            exclude_ids: list[str] | None = None,
+            id: Optional[str] = None,
+            buyer: Optional[str] = None,
+            state: Optional[Literal["closed", "paid", "refunded"]] = None,
+            game: Optional[int] = None,
+            section: Optional[str] = None,
+            server: Optional[int] = None,
+            side: Optional[int] = None,
+            locale: Literal["ru", "en", "uk"] | None = None,
+            subcategories: dict[str, tuple[SubCategoryTypes, int]] | None = None,
+            **more_filters
+    ) -> tuple[str | None, list[OrderShortcut], Literal["ru", "en", "uk"], dict[str, SubCategory]]:
         """
         Получает и парсит список заказов со страницы https://funpay.com/orders/trade
 
@@ -1525,7 +1540,7 @@ class Account:
         :param more_filters: доп. фильтры.
 
         :return: (ID след. заказа (для start_from), список заказов)
-        :rtype: tuple[str | None, list[OrderShortcut], Literal["ru", "en", "uk"], dict[str, SubCategory]]
+        :rtype: tuple[str | None, list[OrderShortcut], str, dict[str, SubCategory]]
         """
         if not self.is_initiated:
             raise exceptions.AccountNotInitiatedError()
@@ -1659,17 +1674,6 @@ class Account:
 
         return next_order_id, sales, locale, subcategories
 
-    def get_sells(self, start_from: str | None = None, include_paid: bool = True, include_closed: bool = True,
-                  include_refunded: bool = True, exclude_ids: list[str] | None = None,
-                  id: Optional[str] = None, buyer: Optional[str] = None,
-                  state: Optional[Literal["closed", "paid", "refunded"]] = None, game: Optional[int] = None,
-                  section: Optional[str] = None, server: Optional[int] = None,
-                  side: Optional[int] = None, **more_filters) -> tuple[str | None, list[OrderShortcut]]:
-        """Эта функция вскоре будет удалена. Используйте Account.get_sales()."""
-        start_from, orders, loc, subcs = self.get_sales(start_from, include_paid, include_closed, include_refunded,
-                                                        exclude_ids, id, buyer, state, game, section, server,
-                                                        side, None, None, **more_filters)
-        return start_from, orders
 
     def add_chats(self, chats: list[ChatShortcut]):
         """

@@ -17,10 +17,7 @@ from Utils import (
 from configs import Config, VERSION_PATH
 
 
-from FunPayAPI import EventTypes, SubCategoryTypes, Currencies, Message, LotShortcut, UserProfile, Balance
-
-
-import FunPayAPI
+from FunPayAPI import Account, Runner, EventTypes, SubCategoryTypes, Currencies, Message, LotShortcut, UserProfile, Balance, exceptions as fpapi_exceptions
 
 
 import json
@@ -101,13 +98,13 @@ class Cardinal:
         else: self.proxy = {}
 
 
-        self.account = FunPayAPI.Account(
+        self.account = Account(
             self.config.FunPay.golden_key,
             self.config.FunPay.user_agent,
             proxy=self.proxy
         )
 
-        self.runner: FunPayAPI.Runner | None = None
+        self.runner: Runner | None = None
         'Runner.'
 
         self.profile: UserProfile | None = None
@@ -233,7 +230,7 @@ class Cardinal:
 
         self.__init_account()
 
-        self.runner = FunPayAPI.Runner(self.account, self.config.FunPay.oldMsgGetMode)
+        self.runner = Runner(self.account, self.config.FunPay.oldMsgGetMode)
 
         self.__update_profile()
 
@@ -307,7 +304,7 @@ class Cardinal:
 
             except TimeoutError: log.warning(self.__translate('c_ext_session_timeout_err'))
 
-            except (FunPayAPI.exceptions.UnauthorizedError, FunPayAPI.exceptions.RequestFailedError) as e: # TODO
+            except (fpapi_exceptions.UnauthorizedError, fpapi_exceptions.RequestFailedError) as e: # TODO
                 log.error(e.short_str)
                 log.debug(e)
 
@@ -367,7 +364,7 @@ class Cardinal:
 
             except TimeoutError: log.error(self.__translate('c_ext_acc_get_timeout_err'))
 
-            except (FunPayAPI.exceptions.UnauthorizedError, FunPayAPI.exceptions.RequestFailedError) as e: # TODO
+            except (fpapi_exceptions.UnauthorizedError, fpapi_exceptions.RequestFailedError) as e: # TODO
                 log.error(e.short_str())
                 log.debug(f'TRACEBACK {e.short_str()}')
 
@@ -402,7 +399,7 @@ class Cardinal:
 
             except TimeoutError: log.error(self.__translate('c_ext_profile_get_timeout_err'))
 
-            except FunPayAPI.exceptions.RequestFailedError as e:
+            except fpapi_exceptions.RequestFailedError as e:
                 log.error(e.short_str())
                 log.debug(e)
 

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from . import (
     DISCORD_RE, DEAR_VENDORS_RE, ORDER_PURCHASED_RE, ORDER_CONFIRMED_RE, NEW_FEEDBACK_RE, NEW_FEEDBACK_ANSWER_RE, FEEDBACK_CHANGED_RE, FEEDBACK_DELETED_RE, REFUND_RE,
-    FEEDBACK_ANSWER_CHANGED_RE, FEEDBACK_ANSWER_DELETED_RE, ORDER_CONFIRMED_BY_ADMIN_RE, PARTIAL_REFUND_RE, ORDER_REOPENED_RE, REFUND_BY_ADMIN_RE, get_message_type_by_re,
-    PRODUCTS_AMOUNT_RE
+    FEEDBACK_ANSWER_CHANGED_RE, FEEDBACK_ANSWER_DELETED_RE, ORDER_CONFIRMED_BY_ADMIN_RE, PARTIAL_REFUND_RE, ORDER_REOPENED_RE, REFUND_BY_ADMIN_RE, PRODUCTS_AMOUNT_RE,
+    generate_random_tag
 )
 
 
@@ -13,6 +13,7 @@ import re
 from dataclasses import dataclass, field
 from enum import Enum
 from datetime import datetime
+from time import time
 
 
 __all__ = [
@@ -42,8 +43,35 @@ __all__ = [
     'Review',
     'Balance',
     'PaymentMethod',
-    'CalcResult'
+    'CalcResult',
+    'InitialChatEvent',
+    'ChatsListChangedEvent',
+    'LastChatMessageChangedEvent',
+    'NewMessageEvent',
+    'MessageEventsStack',
+    'InitialOrderEvent',
+    'OrdersListChangedEvent',
+    'NewOrderEvent',
+    'OrderStatusChangedEvent'
 ]
+
+def __get_message_type_by_re(text: str) -> MessageTypes:
+    '''
+    Возвращает тип сообщения на основе регулярных выражений.
+
+    :param text: Текст сообщения.
+    :type text: str
+    :return: Тип сообщения.
+    :rtype: MessageTypes
+    '''
+    for message_type in MessageTypes:
+        if message_type is MessageTypes.NON_SYSTEM: continue
+
+
+        if message_type.value.search(text): return message_type
+
+
+    return MessageTypes.NON_SYSTEM
 
 
 # ---------------------------------------------------------------------------- #
@@ -244,6 +272,8 @@ class Months(Enum):
 # ---------------------------------------------------------------------------- #
 #                                  Датаклассы                                  #
 # ---------------------------------------------------------------------------- #
+
+# ------------------------------ Объекты FunPay ------------------------------ #
 @dataclass(unsafe_hash=True)
 class BuyerViewing:
     '''
@@ -287,7 +317,7 @@ class ChatShortcut:
         '''
         Тип последнего сообщения в чате на основе регулярных выражений
         '''
-        if self.__last_message_type is None: self.__last_message_type = get_message_type_by_re(self.last_message_text)
+        if self.__last_message_type is None: self.__last_message_type = __get_message_type_by_re(self.last_message_text)
 
 
         return self.__last_message_type
@@ -369,7 +399,7 @@ class Message:
         if self.__type is None:
             if self.author_id == 0: self.__type = MessageTypes.NON_SYSTEM
 
-            else: self.__type = get_message_type_by_re(self.text)
+            else: self.__type = __get_message_type_by_re(self.text)
 
 
         return self.__type
@@ -1255,3 +1285,100 @@ class CalcResult:
 
 
     def __hash__(self): return hash((self.subcategory_type, self.subcategory_id, self.price, self.min_price_with_commission, self.min_price_currency, self.account_currency))
+
+
+# ------------------------------ События FunPay ------------------------------ #
+@dataclass
+class BaseEvent:
+    runner_tag: str
+    '''Тег Runner'а.'''
+    type: EventTypes
+    'Тип события.'
+    event_time: int | float = field(init=False, default_factory=time)
+    'Время события.'
+
+
+@dataclass(unsafe_hash=True)
+class InitialChatEvent(BaseEvent):
+    type: EventTypes = field(init=False, default=EventTypes.INITIAL_CHAT)
+    'Тип события.'
+    chat: ChatShortcut
+    "Объект обнаруженного чата."
+
+
+@dataclass(unsafe_hash=True)
+class ChatsListChangedEvent(BaseEvent): # TODO: добавить список всех чатов.
+    type: EventTypes = field(init=False, default=EventTypes.CHATS_LIST_CHANGED)
+    'Тип события.'
+
+
+@dataclass(unsafe_hash=True)
+class LastChatMessageChangedEvent(BaseEvent):
+    type: EventTypes = field(init=False, default=EventTypes.LAST_CHAT_MESSAGE_CHANGED)
+    'Тип события.'
+    chat: ChatShortcut
+    "Объект чата, в котором изменилось последнее сообщение."
+
+
+@dataclass
+class NewMessageEvent(BaseEvent):
+    type: EventTypes = field(init=False, default=EventTypes.NEW_MESSAGE)
+    'Тип события.'
+    message: Message
+    "Объект нового сообщения."
+    stack: MessageEventsStack
+    "Объект стека событий новых сообщений."
+
+
+@dataclass
+class MessageEventsStack:
+    id: str = field(init=False, default_factory=generate_random_tag)
+    'Айди стека.'
+    stack: list[NewMessageEvent] = field(init=False, default_factory=list)
+
+
+    def add_events(self, messages: list[NewMessageEvent]) -> None:
+        """
+        Добавляет события новых сообщений в стэк.
+
+        :param messages: список событий новых сообщений.
+        :type messages: list[NewMessageEvent]
+        """
+        self.stack.extend(messages)
+
+
+    def __hash__(self): return hash((self.id,))
+
+
+@dataclass(unsafe_hash=True)
+class InitialOrderEvent(BaseEvent):
+    type: EventTypes = field(init=False, default=EventTypes.INITIAL_ORDER)
+    'Тип события.'
+    order: OrderShortcut
+    "Объект обнаруженного заказа."
+
+
+@dataclass(unsafe_hash=True)
+class OrdersListChangedEvent(BaseEvent):
+    type: EventTypes = field(init=False, default=EventTypes.ORDERS_LIST_CHANGED)
+    'Тип события.'
+    purchases: int
+    "Кол-во незавершенных покупок."
+    sales: int
+    "Кол-во незавершенных продаж."
+
+
+@dataclass(unsafe_hash=True)
+class NewOrderEvent(BaseEvent):
+    type: EventTypes = field(init=False, default=EventTypes.NEW_ORDER)
+    'Тип события.'
+    order: OrderShortcut
+    "Объект нового заказа."
+
+
+@dataclass(unsafe_hash=True)
+class OrderStatusChangedEvent(BaseEvent):
+    type: EventTypes = field(init=False, default=EventTypes.ORDER_STATUS_CHANGED)
+    'Тип события.'
+    order: OrderShortcut
+    "Объект измененного заказа."

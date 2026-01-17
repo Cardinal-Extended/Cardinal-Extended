@@ -3,10 +3,10 @@ from __future__ import annotations
 
 
 from typing import TYPE_CHECKING
-if TYPE_CHECKING: from .. import Category
 
-
-import requests
+if TYPE_CHECKING:
+    from . import Category
+    from requests import Response
 
 
 __all__ = [
@@ -35,7 +35,7 @@ class AccountNotInitiatedError(Exception):
 
 
 class RequestFailedError(Exception):
-    def __init__(self, response: requests.Response):
+    def __init__(self, response: Response):
         '''
         Исключение, поднимающееся при статус-коде ответа != 200.
 
@@ -133,7 +133,7 @@ class RaiseError(RequestFailedError):
 
 
 class ImageUploadError(RequestFailedError):
-    def __init__(self, response: requests.Response, error_message: str | None):
+    def __init__(self, response: Response, error_message: str | None):
         '''
         Исключение, поднимающееся при ошибке выгрузки изображения.
         '''
@@ -155,7 +155,7 @@ class ImageUploadError(RequestFailedError):
 
 
 class MessageNotDeliveredError(RequestFailedError):
-    def __init__(self, response: requests.Response, error_message: str | None, chat_id: int):
+    def __init__(self, response: Response, error_message: str | None, chat_id: int):
         '''
         Исключение, поднимающееся при ошибке отправки сообщения.
         '''
@@ -179,7 +179,7 @@ class MessageNotDeliveredError(RequestFailedError):
 
 
 class FeedbackEditingError(RequestFailedError):
-    def __init__(self, response: requests.Response, error_message: str | None, order_id: str):
+    def __init__(self, response: Response, error_message: str | None, order_id: str):
         '''
         Исключение, поднимающееся при ошибке добавления/редактирования/удаления отзыва/ответа на отзыв.
         '''
@@ -203,7 +203,7 @@ class FeedbackEditingError(RequestFailedError):
 
 
 class LotParsingError(RequestFailedError):
-    def __init__(self, response: requests.Response, error_message: str | None, lot_id: int):
+    def __init__(self, response: Response, error_message: str | None, lot_id: int):
         '''
         Исключение, поднимающееся при ошибке получения полей лота.
         '''
@@ -227,7 +227,7 @@ class LotParsingError(RequestFailedError):
 
 
 class LotSavingError(RequestFailedError):
-    def __init__(self, response: requests.Response, error_message: str | None, lot_id: int, errors: dict[str, str]):
+    def __init__(self, response: Response, error_message: str | None, lot_id: int, errors: dict[str, str]):
         '''
         Исключение, поднимающееся при ошибке сохранения лота.
         '''
@@ -254,7 +254,7 @@ class LotSavingError(RequestFailedError):
 
 class RefundError(RequestFailedError):
 
-    def __init__(self, response: requests.Response, error_message: str | None, order_id: str):
+    def __init__(self, response: Response, error_message: str | None, order_id: str):
         '''
         Исключение, поднимающееся при ошибке возврата средств за заказ.
         '''

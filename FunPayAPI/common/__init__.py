@@ -1,4 +1,10 @@
 
+from __future__ import annotations
+
+
+from . import exceptions
+
+
 import string
 import random
 
@@ -257,32 +263,11 @@ EXCHANGE_RATE_RE = re.compile(
 '''
 
 
-from . import exceptions
-
-
 from .types import *
 
 
-def get_message_type_by_re(text: str) -> MessageTypes:
-    '''
-    Возвращает тип сообщения на основе регулярных выражений.
-
-    :param text: Текст сообщения.
-    :type text: str
-    :return: Тип сообщения.
-    :rtype: MessageTypes
-    '''
-    for message_type in MessageTypes:
-        if message_type is MessageTypes.NON_SYSTEM: continue
-
-
-        if message_type.value.search(text): return message_type
-
-
-    return MessageTypes.NON_SYSTEM
-
-
 __all__ = [
+    'exceptions',
     'generate_random_tag',
     'ORDER_ID_RE',
     'PRODUCTS_AMOUNT_RE',
@@ -302,7 +287,6 @@ __all__ = [
     'DISCORD_RE',
     'DEAR_VENDORS_RE',
     'EXCHANGE_RATE_RE',
-    'exceptions',
     'EventTypes',
     'MessageTypes',
     'OrderStatuses',
@@ -330,5 +314,13 @@ __all__ = [
     'Balance',
     'PaymentMethod',
     'CalcResult',
-    'get_message_type_by_re'
+    'InitialChatEvent',
+    'ChatsListChangedEvent',
+    'LastChatMessageChangedEvent',
+    'NewMessageEvent',
+    'MessageEventsStack',
+    'InitialOrderEvent',
+    'OrdersListChangedEvent',
+    'NewOrderEvent',
+    'OrderStatusChangedEvent'
 ]
