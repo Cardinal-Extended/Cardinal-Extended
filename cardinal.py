@@ -637,6 +637,9 @@ class Cardinal:
                 return self.config.check_for_updates_delay
 
 
+        except SystemExit: exit('Запланированное закрытие программы')
+
+
         # ---------- Ошибка при обновлении - повторяем попытку через минуту ---------- #
         except:
             log.warning(self.translate('c_ext_check_updates_error'))

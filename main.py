@@ -97,7 +97,7 @@ try:
     crd.init().start()
 
 
-except KeyboardInterrupt:
+except (KeyboardInterrupt, SystemExit):
     log.info('Exiting program...')
 
     sys.exit()
