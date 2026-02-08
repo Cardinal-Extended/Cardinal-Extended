@@ -9,21 +9,6 @@ if TYPE_CHECKING:
     from requests import Response
 
 
-__all__ = [
-    'AccountNotInitiatedError',
-    'RequestFailedError',
-    'UnauthorizedError',
-    'WithdrawError',
-    'RaiseError',
-    'ImageUploadError',
-    'MessageNotDeliveredError',
-    'FeedbackEditingError',
-    'LotParsingError',
-    'LotSavingError',
-    'RefundError'
-]
-
-
 class AccountNotInitiatedError(Exception):
     def __init__(self):
         '''
@@ -61,11 +46,11 @@ class RequestFailedError(Exception):
 
     def __str__(self):
         msg = (
-            f'Ошибка запроса к {self.url} .\n'
-            f'Метод: {self.response.request.method} .\n'
-            f'Статус-код ответа: {self.status_code} .\n'
-            f'Заголовки запроса: {self.request_headers} .\n'
-            f'Тело запроса: {self.request_body} .\n'
+            f'Ошибка запроса к {self.url}.\n'
+            f'Метод: {self.response.request.method}.\n'
+            f'Статус-код ответа: {self.status_code}.\n'
+            f'Заголовки запроса: {self.request_headers}.\n'
+            f'Тело запроса: {self.request_body}.\n'
             f'Текст ответа: {self.response.text}'
         )
 
@@ -275,3 +260,18 @@ class RefundError(RequestFailedError):
 
 
         return msg
+
+
+__all__ = [
+    'AccountNotInitiatedError',
+    'RequestFailedError',
+    'UnauthorizedError',
+    'WithdrawError',
+    'RaiseError',
+    'ImageUploadError',
+    'MessageNotDeliveredError',
+    'FeedbackEditingError',
+    'LotParsingError',
+    'LotSavingError',
+    'RefundError'
+]

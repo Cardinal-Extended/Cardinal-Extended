@@ -2,13 +2,6 @@
 from pathlib import Path
 
 
-__all__ = [
-    'LocaleNotFoundError',
-    'LocaleLoadError',
-    'FormatError'
-]
-
-
 class LocaleNotFoundError(Exception):
     def __init__(self, locale_path: Path, locale_name: str):
         '''
@@ -60,3 +53,10 @@ class FormatError(Exception):
 
 
     def __str__(self): return f'Не удалось отформатировать строку "{self.text}" (args={self.args}; kwargs={self.kwargs}): {self.error}'
+
+
+__all__ = [
+    'LocaleNotFoundError',
+    'LocaleLoadError',
+    'FormatError'
+]

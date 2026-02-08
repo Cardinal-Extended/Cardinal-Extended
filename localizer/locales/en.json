@@ -5,7 +5,8 @@
 
 
     "c_ext_getting_acc": "Getting account data.",
-    "c_ext_acc_get_timeout_err": "Failed to load account data: Timeout exceeded.",
+    "c_ext_acc_get_balance_get_error": "Failed to load account data: an error occurred while getting balance.",
+    "c_ext_acc_get_timeout_err": "Failed to load account data: timeout exceeded.",
     "c_ext_acc_get_unexpected_err": "An unexpected error occurred while retrieving account information.",
 
 
@@ -23,6 +24,8 @@
 
 
     "c_ext_getting_balance": "Getting balance.",
+    "c_ext_getting_balance_unexcepted_err": "An unexpected error occurred while getting balance.",
+    "c_ext_get_balance_too_many_attempts_err": "An error occurred while getting balance: the number of attempts ({}) was exceeded.",
 
 
     "c_ext_getting_plugins": "Receiving plugins info.",
@@ -71,6 +74,7 @@
     "c_ext_session_unexpected_err": "An unexpected error occurred while refreshing the session.",
     "c_ext_session_no_more_attempts_err": "Failed to refresh session: the number of attempts was exceeded.",
     "c_ext_starting_session_loop": "$CYANThe session refresh loop is starting.",
+    "c_ext_session_update_error": "An error occurred while refreshing the session.",
 
 
     "c_ext_starting_process_events_loop": "Starting the event listener.",
@@ -81,15 +85,25 @@
 
     "c_ext_checking_updates": "Checking for updates.",
     "c_ext_new_version_available": "New version is available: {}.",
-    "c_ext_check_updates_error": "An error occurred when checking for updates: {}",
+    "c_ext_new_prerelease_version_available": "New pre-release version is available: {}.",
+    "c_ext_check_updates_error": "An error occurred while checking for updates.",
 
 
     "c_ext_starting_update": "Updating Cardinal.",
     "c_ext_update_error": "An error occurred during update.",
 
 
+    "c_ext_downloading_release": "Downloading Cardinal update ({}).",
+    "c_ext_installing_release": "Installing Cardinal update ({}).",
+
+
+    "c_ext_request_failed_error_short_str": "An error occurred while sending request to {}. (Status-code: {})",
+    "c_ext_request_failed_error": "Request error: {}.\nMethod: {}.\nStatus-code: {}.\nRequest headers: {}.\nRequest body: {}.\nResponse text: {}",
+    "c_ext_unauthorized_error_short_str": "Not authorized (maybe wrong golden_key?)",
+
+
     "c_ext_msg_sent": "Sent a message to the chat $YELLOW{}.",
-    "c_ext_msg_send_err": "An error occurred when sending a message to chat $YELLOW{}$RESET.",
+    "c_ext_msg_send_err": "An error occurred while sending a message to chat $YELLOW{}$RESET.",
     "c_ext_msg_attempts_left": "Attempts left: $YELLOW{}$RESET.",
     "c_ext_msg_no_more_attempts_err": "Failed to send a message to chat $YELLOW{}$RESET: the number of attempts exceeded.",
 

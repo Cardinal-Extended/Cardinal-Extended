@@ -1,18 +1,16 @@
-
-from . import LOGGER_CONFIG_PATH,  PATHS_CONFIG_PATH
+'Здесь описан основной класс конфига бота.'
+from . import CONFIGS_DIR
 
 from dynaconf import Dynaconf
 from dynaconf import loaders as DynaLoaders
 
 
+import tomllib
+
+
 from pathlib import Path
 from threading import Lock
 from typing import Any
-
-
-__all__ = [
-    'Config'
-]
 
 
 class Config:
@@ -22,10 +20,7 @@ class Config:
     }
 
 
-    __settings_files: dict[str, Path] = {
-        'LOGGER': LOGGER_CONFIG_PATH,
-        'PATHS': PATHS_CONFIG_PATH
-    }
+    __settings_files: dict[str, Path] = {}
     'Список загружаемых файлов конфигов с соответствующими именами секций.'
 
 
@@ -54,6 +49,24 @@ class Config:
 
 
     @classmethod
+    def init_config(cls) -> None:
+        '''
+        Проходит по всем конфигам в папке конфигов, считывает секции и добавляет в загружаемые конфиги.
+        '''
+        for config_path in CONFIGS_DIR.glob('*.toml'):
+            if config_path in cls.__settings_files.values(): continue
+
+
+            with config_path.open('rb') as fp: config = tomllib.load(fp)
+            sections = [*config]
+
+            cls.add_config_file(config_path, sections)
+
+
+        return
+
+
+    @classmethod
     def add_config_file(cls, config_path: Path, section_names: list[str] | None = None) -> None:
         '''
         Добавляет путь к файлу конфига в список конфигов для загрузки.
@@ -74,7 +87,7 @@ class Config:
         if not section_names: section_names = [config_path.stem.upper()]
 
         for section_name in section_names:
-            if Config.__settings_files.get(section_name, None): raise ValueError('Конфиг с указанным именем секции уже существует!')
+            if Config.__settings_files.get(section_name, None): raise ValueError(f'Конфиг с указанным именем секции {section_name} уже существует!')
 
             Config.__settings_files[section_name] = config_path
 
@@ -111,70 +124,70 @@ class Config:
         :param force_save: Игнорировать Lock, defaults to False.
         :type force_save: bool, optional
         '''
+        def save_without_section():
+            config_paths_sections: dict[Path, list[str]] = {}
+
+            for section_name in Config.__settings_files:
+                config_path = Config.__settings_files[section_name]
+
+                config_paths_sections[config_path] = list(set(config_paths_sections.get(config_path, []) + [section_name]))
+
+
+            for config_path in config_paths_sections:
+                config_sections = config_paths_sections[config_path]
+
+
+                config_dict: dict[str, dict] = {}
+
+                for section_name in config_sections: config_dict[section_name] = self.config.to_dict()[section_name]
+
+
+                DynaLoaders.write(str(config_path), config_dict)
+
+
+        def save_with_section():
+            config_file_path: Path = Config.__settings_files[self.__section]
+
+            sections_to_save: list[str] = self.__get_same_config_file_sections()
+
+
+            settings_files = self.__settings_files_list
+
+            configs: dict[str, Dynaconf] = {
+                section_name: Dynaconf(
+                settings_files=settings_files,
+                environments=True,
+                env=section_name
+            ) for section_name in sections_to_save
+            }
+
+
+            end_config_dict: dict[str, Any] = {self.__section: self.config.to_dict()}
+
+            end_config_dict.update(
+                {section_name: config.to_dict() for section_name, config in configs.items()}
+            )
+
+
+            DynaLoaders.write(str(config_file_path), end_config_dict)
+
+
+            return
+
+
         if not force_save: self.__lock.acquire()
 
 
-        if self.__section: self.__save_with_section()
+        if self.__section: save_with_section()
 
 
-        else: self.__save_without_section()
+        else: save_without_section()
 
 
         if not force_save: self.__lock.release()
 
 
         self.update_config()
-
-        return
-
-
-    def __save_without_section(self):
-        config_paths_sections: dict[Path, list[str]] = {}
-
-        for section_name in Config.__settings_files:
-            config_path = Config.__settings_files[section_name]
-
-            config_paths_sections[config_path] = list(set(config_paths_sections.get(config_path, []) + [section_name]))
-
-
-        for config_path in config_paths_sections:
-            config_sections = config_paths_sections[config_path]
-
-
-            config_dict: dict[str, dict] = {}
-
-            for section_name in config_sections: config_dict[section_name] = self.config.to_dict()[section_name]
-
-
-            DynaLoaders.write(str(config_path), config_dict)
-
-
-    def __save_with_section(self):
-        config_file_path: Path = Config.__settings_files[self.__section]
-
-        sections_to_save: list[str] = self.__get_same_config_file_sections()
-
-
-        settings_files = self.__settings_files_list
-
-        configs: dict[str, Dynaconf] = {
-            section_name: Dynaconf(
-            settings_files=settings_files,
-            environments=True,
-            env=section_name
-        ) for section_name in sections_to_save
-        }
-
-
-        end_config_dict: dict[str, Any] = {self.__section: self.config.to_dict()}
-
-        end_config_dict.update(
-            {section_name: config.to_dict() for section_name, config in configs.items()}
-        )
-
-
-        DynaLoaders.write(str(config_file_path), end_config_dict)
-
 
         return
 
@@ -238,3 +251,8 @@ class Config:
         Config.__locks[self.__section] = Lock()
 
         return Config.__locks.get(self.__section)
+
+
+__all__ = [
+    'Config'
+]

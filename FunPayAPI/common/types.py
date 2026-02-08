@@ -16,45 +16,6 @@ from datetime import datetime
 from time import time
 
 
-__all__ = [
-    'EventTypes',
-    'MessageTypes',
-    'OrderStatuses',
-    'SubCategoryTypes',
-    'Currencies',
-    'Wallets',
-    'Months',
-    'BuyerViewing',
-    'ChatShortcut',
-    'Chat',
-    'Message',
-    'OrderShortcut',
-    'Order',
-    'Category',
-    'SubCategory',
-    'LotFields',
-    'ChipOffer',
-    'ChipFields',
-    'LotPage',
-    'SellerShortcut',
-    'LotShortcut',
-    'MyLotShortcut',
-    'UserProfile',
-    'Review',
-    'Balance',
-    'PaymentMethod',
-    'CalcResult',
-    'InitialChatEvent',
-    'ChatsListChangedEvent',
-    'LastChatMessageChangedEvent',
-    'NewMessageEvent',
-    'MessageEventsStack',
-    'InitialOrderEvent',
-    'OrdersListChangedEvent',
-    'NewOrderEvent',
-    'OrderStatusChangedEvent'
-]
-
 def __get_message_type_by_re(text: str) -> MessageTypes:
     '''
     Возвращает тип сообщения на основе регулярных выражений.
@@ -1382,3 +1343,43 @@ class OrderStatusChangedEvent(BaseEvent):
     'Тип события.'
     order: OrderShortcut
     "Объект измененного заказа."
+
+
+__all__ = [
+    'EventTypes',
+    'MessageTypes',
+    'OrderStatuses',
+    'SubCategoryTypes',
+    'Currencies',
+    'Wallets',
+    'Months',
+    'BuyerViewing',
+    'ChatShortcut',
+    'Chat',
+    'Message',
+    'OrderShortcut',
+    'Order',
+    'Category',
+    'SubCategory',
+    'LotFields',
+    'ChipOffer',
+    'ChipFields',
+    'LotPage',
+    'SellerShortcut',
+    'LotShortcut',
+    'MyLotShortcut',
+    'UserProfile',
+    'Review',
+    'Balance',
+    'PaymentMethod',
+    'CalcResult',
+    'InitialChatEvent',
+    'ChatsListChangedEvent',
+    'LastChatMessageChangedEvent',
+    'NewMessageEvent',
+    'MessageEventsStack',
+    'InitialOrderEvent',
+    'OrdersListChangedEvent',
+    'NewOrderEvent',
+    'OrderStatusChangedEvent'
+]

@@ -10,12 +10,6 @@ from typing import Literal, Self
 import json
 
 
-__all__ = [
-    'Localizer',
-    'LOCALES_DIR'
-]
-
-
 log = logging.getLogger('Localizer')
 
 
@@ -178,3 +172,8 @@ class Localizer:
         with open(LOCALES_DIR / f'{locale}.json', 'w', encoding='utf-8') as fp: json.dump(current_localization, fp)
 
         return
+
+
+__all__ = [
+    'Localizer'
+]

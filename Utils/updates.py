@@ -2,10 +2,7 @@
 import shutil
 
 
-from . import (
-    GITHUB_TAGS_URL, GITHUB_RELEASES_URL, Release, CheckUpdatesResponses, InstallUpdateResponses, exceptions,
-    CheckUpdatesResponse
-)
+from . import Tag, Release, exceptions
 from configs import CONFIGS_DIR, STORAGE_DIR, PLUGINS_DIR, CACHE_DIR, UPDATE_DIR, BACKUP_DIR
 
 
@@ -15,18 +12,6 @@ from zipfile import ZipFile
 
 from pathlib import Path
 from time import sleep
-import json
-
-
-__all__ = [
-    'get_new_releases',
-    'download_zip',
-    'extract_update_archive',
-    'create_backup',
-    'extract_backup_archive',
-    'install_release',
-    'install_backup'
-]
 
 
 HEADERS = {
@@ -34,187 +19,301 @@ HEADERS = {
 }
 
 
-def get_tags(current_tag: str) -> list[str]:
+# ---------------------------------------------------------------------------- #
+#                                  Обновления                                  #
+# ---------------------------------------------------------------------------- #
+
+# ----------------------------------- Теги ----------------------------------- #
+def get_tags(tag: str, github_api_url: str) -> list[Tag]:
     '''
     Получает все теги с GitHub репозитория.
 
-    :param current_tag: текущий тег.
-    :type current_tag: str
-    :raises GitHubRequestError: Ошибка, возникающая при ошибке запроса к GitHub'у.
+    :param tag: Текущий тег.
+    :type tag: str
+    :param github_api_url: Ссылка на апи репозитория (api.github.com/repos/{user}/{repo}).
+    :type github_api_url: str
+    :raises GitHubRequestError: Если не удалось получить список тегов.
     :return: Список тегов.
-    :rtype: list[str]
+    :rtype: list[dict[str, Any]]
     '''
     page = 1
-    json_response: list[dict] = []
+    result: list[Tag] = []
 
-    while not any([el.get("name") == current_tag for el in json_response]):
+    while True:
         if page != 1: sleep(1)
 
 
-        response = requests.get(f"{GITHUB_TAGS_URL}?page={page}", headers=HEADERS)
-
-        if not response.status_code == 200 or not response.json(): raise exceptions.GitHubRequestError(response)
-
-        else:
-            json_response.extend(response.json())
-            page += 1
+        response = requests.get(f"{github_api_url}/tags?page={page}", headers=HEADERS)
 
 
-    tags = [i.get("name") for i in json_response]
+        json_response = response.json()
 
-    return tags
-
-
-def get_next_tag(tags: list[str], current_tag: str) -> str | None:
-    '''
-    Ищет след. тег после переданного. Если не находит текущий тег, возвращает первый. Если текущий тег - последний, возвращает None.
-
-    :param tags: Список тегов.
-    :type tags: list[str]
-    :param current_tag: Текущий тег.
-    :type current_tag: str
-    :return: След. тег / первый тег / None.
-    :rtype: str | None
-    '''
-    try: curr_index = tags.index(current_tag)
-
-    except ValueError: return tags[len(tags) - 1]
+        if response.status_code != 200 or not json_response: break
 
 
-    if not curr_index: return None
+        tags = [Tag(json=_) for _ in json_response]
 
-    return tags[curr_index - 1]
-
-
-def get_releases(from_tag: str) -> list[Release]:
-    '''
-    Получает данные о доступных релизах, начиная с тега.
-
-    _extended_summary_
-
-    :param from_tag: Тег релиза, с которого начинать поиск.
-    :type from_tag: str
-    :raises GitHubRequestError: Ошибка, возникающая при ошибке запроса к GitHub'у.
-    :return: Список релизов.
-    :rtype: list[Release]
-    '''
-    page = 1
-    json_response: list[dict] = []
-    while not any([el.get("tag_name") == from_tag for el in json_response]):
-        if page != 1: sleep(1)
+        result.extend(tags)
 
 
-        response = requests.get(f"{GITHUB_RELEASES_URL}?page={page}", headers=HEADERS)
-
-        if not response.status_code == 200 or not response.json(): raise exceptions.GitHubRequestError(response.status_code)
-
-        else:
-            json_response.extend(response.json())
-            page += 1
+        if tag is not None and any([_tag.name == tag for _tag in tags]): break
 
 
-    result = []
-    to_append = False
-
-    for el in json_response[::-1]:
-        if (name := el.get("tag_name")) == from_tag: to_append = True
-
-        if to_append:
-            description = el.get("body")
-
-            sources = el.get("zipball_url")
-
-            if "#unskippable" in description: to_append = False
+        page+=1
 
 
-            release = Release(name, description, sources)
-
-            result.append(release)
-
-
-            if not to_append: break
+    if not result: raise exceptions.GitHubRequestError(response)
 
 
     return result
 
 
-def get_new_releases(current_tag: str) -> CheckUpdatesResponse:
+def get_next_tag(tags: list[Tag], tag: str) -> Tag | None:
+    '''
+    Ищет след. тег после переданного. Если не находит текущий тег, возвращает первый. Если текущий тег - последний, возвращает None.
+
+    :param tags: Список тегов.
+    :type tags: list[Tag]
+    :param tag: Текущий тег.
+    :type tag: str
+    :raises GetNextTagError: Если не удалось найти тег в списке.
+    :return: След. тег / первый тег / None.
+    :rtype: str | None
+    '''
+    for current_index in range(len(tags)):
+        if tags[current_index].name == tag: break
+
+    else: raise exceptions.GetNextTagError(tag, tags)
+
+
+    if not current_index: return None
+
+
+    return tags[current_index - 1]
+
+
+# ---------------------------------- Релизы ---------------------------------- #
+def get_releases(github_api_url: str, from_tag: Tag | None = None) -> list[Release]:
+    '''
+    Получает данные о доступных релизах, начиная с тега.
+
+    :param from_tag: Тег релиза, с которого начинать поиск, defaults to None.
+    :type from_tag: Tag | None, optional
+    :param github_api_url: Ссылка на апи репозитория (api.github.com/repos/{user}/{repo}).
+    :type github_api_url: str
+    :raises ReleaseNotFoundError: Если не удалось найти релиз с тегом from_tag.
+    :return: Список релизов.
+    :rtype: list[Release]
+    '''
+    page = 1
+    result: list[Release] = []
+    while True:
+        if page != 1: sleep(1)
+
+
+        response = requests.get(f"{github_api_url}/releases?page={page}", headers=HEADERS)
+
+
+        json_response = response.json()
+
+        if response.status_code != 200 or not json_response: break
+
+
+        releases = [Release(json=release) for release in json_response]
+
+        result.extend(releases)
+
+
+        if from_tag is not None and any([release.tag_name == from_tag.name for release in releases]): break
+
+
+        page+=1
+
+
+    if not result: raise exceptions.GitHubRequestError(response)
+
+
+    result.reverse()
+
+
+    if from_tag:
+        from_index = None
+        for from_index in range(len(result)):
+            if result[from_index].tag_name == from_tag.name: break
+
+        else: raise exceptions.ReleaseNotFoundError(from_tag, result)
+
+
+        result = result[from_index:]
+
+
+    return result
+
+
+def get_new_releases(current_tag: str, github_api_url: str) -> list[Release] | None:
     '''
     Проверяет на наличие обновлений.
 
-    :param current_tag: Тег текущей версии.
-    :type current_tag: str
-    :return: Ответ.
-    :rtype: CheckUpdatesResponse
+    :param tag: Текущий тег.
+    :type tag: str
+    :param github_api_url: Ссылка на апи репозитория (api.github.com/repos/{user}/{repo}).
+    :type github_api_url: str
+    :raises exceptions.GetNewReleasesError: Если не удалось получить список релизов.
+    :return: Список релизов, если найдена новая версия.
+    :rtype: list[Release] | None
     '''
-    try: tags = get_tags(current_tag)
-
-
-    except Exception as err:
-        return CheckUpdatesResponse(
-            CheckUpdatesResponses.TAGS_NOT_FOUND,
-            err
-        )
+    tags = get_tags(current_tag, github_api_url)
 
 
     next_tag = get_next_tag(tags, current_tag)
 
-
-    if not next_tag: return CheckUpdatesResponse(
-        CheckUpdatesResponses.CARDINAL_IS_UP_TO_DATE
-    )
+    if not next_tag: return None
 
 
-    try:
-        releases = get_releases(next_tag)
+    releases = get_releases(github_api_url, next_tag)
 
-        if not releases: raise Exception('Не удалось получить информацию о новой версии')
-
-
-    except Exception as err:
-        return CheckUpdatesResponse(
-            CheckUpdatesResponses.RELEASES_NOT_FOUND,
-            err
-        )
+    if not releases: raise exceptions.GetNewReleasesError(next_tag)
 
 
-    return CheckUpdatesResponse(
-        CheckUpdatesResponses.UPDATE_AVAILABLE,
-        releases=releases
-    )
+    return releases
 
 
-def download_zip(url: str) -> None:
+# --------------------------------- Установка -------------------------------- #
+def download_release(release: Release) -> None:
     '''
-    Загружает zip архив с обновлением в кеш.
+    Скачивает архив релиза.
 
-    :param url: ссылка на zip архив.
+    :param release: Релиз.
+    :type release: Release
+    '''
+    download_zip(release.zipball_url, CACHE_DIR / 'update.zip')
+
+
+    return
+
+
+def extract_release() -> str:
+    '''
+    Разархивирует архив с обновлением.
+
+    :return: Имя папки с обновлением.
+    :rtype: str
+    '''
+    update_folder = extract_archive(CACHE_DIR / 'update.zip', UPDATE_DIR)
+
+
+    return update_folder
+
+
+def install_release(folder_name: str) -> None:
+    '''
+    Устанавливает обновление.
+
+    :param folder_name: Название папки со скачанным обновлением в папке обновлений.
+    :type folder_name: str
+    '''
+
+    release_folder = UPDATE_DIR.joinpath(folder_name)
+
+
+    for _ in release_folder.iterdir():
+        file = _.name
+
+        if _.is_file(): shutil.copy2(_, file)
+        else: shutil.copytree(_, file, dirs_exist_ok=True)
+
+
+    return
+
+
+# ---------------------------------------------------------------------------- #
+#                                    Бекапы                                    #
+# ---------------------------------------------------------------------------- #
+def create_backup() -> None:
+    '''
+    Создает резервную копию с папками storage, configs и plugins.
+    '''
+    with ZipFile("backup.zip", "w") as zip:
+        zipdir(CONFIGS_DIR, zip)
+        zipdir(STORAGE_DIR, zip)
+        zipdir(PLUGINS_DIR, zip)
+
+
+    return
+
+
+def extract_backup_archive() -> None:
+    '''
+    Разархивирует скачанный backup.zip в папку бекапа.
+    '''
+    extract_archive('backup.zip', BACKUP_DIR)
+
+
+    return
+
+
+def install_backup() -> None:
+    '''
+    Устанавливает бекап.
+
+    :raises BackupNotFoundError: Если отсутствует распакованный бекап.
+    '''
+    if not BACKUP_DIR.exists(): raise exceptions.BackupNotFoundError()
+
+
+    for _ in BACKUP_DIR.iterdir():
+        file = _.name
+
+        if _.is_file(): shutil.copy2(_, file)
+
+        else: shutil.copytree(_, file, dirs_exist_ok=True)
+
+
+    return
+
+
+# ---------------------------------------------------------------------------- #
+#                               Работа с файлами                               #
+# ---------------------------------------------------------------------------- #
+def download_zip(url: str, zip_path: Path) -> None:
+    '''
+    Загружает zip архив с обновлением.
+
+    :param url: Ссылка на zip архив.
     :type url: str
+    :param zip_path: Конечный путь.
+    :type zip_path: Path
     '''
     with requests.get(url, stream=True) as r:
         r.raise_for_status()
 
-        with open(CACHE_DIR / 'update.zip', 'wb') as fp:
+        with open(zip_path, 'wb') as fp:
             for chunk in r.iter_content(chunk_size=8192): fp.write(chunk)
 
 
     return
 
 
-def extract_update_archive() -> str:
+def extract_archive(zip_path: Path, path: Path) -> str:
     '''
-    Разархивирует скачанный update.zip.
+    Разархивирует архив.
 
+    :param zip_path: Путь к архиву.
+    :type zip_path: Path
+    :param path: Конечный путь.
+    :type path: Path
     :return: Название папки с обновлением (storage/cache/update/<папка с обновлением>).
     :rtype: str
     '''
-    if UPDATE_DIR.exists(): shutil.rmtree(UPDATE_DIR, ignore_errors=True)
+    if path.exists(): shutil.rmtree(path, ignore_errors=True)
+
+    path.mkdir(parents=True, exist_ok=True)
 
 
-    with ZipFile(CACHE_DIR / 'update.zip', "r") as zip:
+    with ZipFile(zip_path, "r") as zip:
         folder_name = zip.filelist[0].filename
 
-        zip.extractall(UPDATE_DIR)
+        zip.extractall(path)
 
 
     return folder_name
@@ -238,94 +337,18 @@ def zipdir(path: Path, zip_obj: ZipFile) -> None:
     return
 
 
-def create_backup() -> None:
-    '''
-    Создает резервную копию с папками storage, configs и plugins.
-    '''
-    with ZipFile("backup.zip", "w") as zip:
-        zipdir(STORAGE_DIR, zip)
-        zipdir(CONFIGS_DIR, zip)
-        zipdir(PLUGINS_DIR, zip)
-
-
-    return
-
-
-def extract_backup_archive() -> None:
-    '''
-    Разархивирует скачанный backup.zip в папку бекапа.
-    '''
-    if BACKUP_DIR.exists(): shutil.rmtree(BACKUP_DIR, ignore_errors=True)
-
-    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-
-
-    with ZipFile(CACHE_DIR / 'backup.zip', "r") as zip: zip.extractall(BACKUP_DIR)
-
-
-    return
-
-
-def install_release(folder_name: str) -> InstallUpdateResponses:
-    '''
-    Устанавливает обновление.
-
-    :param folder_name: Название папки со скачанным обновлением в папке обновлений.
-    :type folder_name: str
-    :return: Статус обновления.
-    :rtype: InstallUpdateResponses
-    '''
-    reboot_flag = False
-
-    try:
-        release_folder = UPDATE_DIR.joinpath(folder_name)
-
-        if not release_folder.exists(): return InstallUpdateResponses.UPDATE_FOLDER_NOT_FOUND
-
-
-        update_info_path = release_folder.joinpath('update.json')
-
-        reboot_flag = False
-
-        if update_info_path.exists():
-            with open(update_info_path, "r", encoding="utf-8") as fp: data = json.loads(fp.read())
-
-            reboot_flag = data.get('reboot_required', False)
-
-
-        for _ in release_folder.iterdir():
-            file = _.name
-
-            if file == 'update.json': continue
-
-
-            if _.is_file(): shutil.copy2(_, file)
-
-            else: shutil.copytree(_, file, dirs_exist_ok=True)
-
-
-        if reboot_flag: return InstallUpdateResponses.REBOOT_IS_REQUIRED
-
-        return InstallUpdateResponses.INSTALL_SUCCESS
-
-    except: return InstallUpdateResponses.UNEXCEPTED_ERROR
-
-
-def install_backup() -> None:
-    '''
-    Устанавливает бекап.
-
-    :raises BackupNotFoundError: Если отсутствует распакованный бекап.
-    '''
-    if not BACKUP_DIR.exists(): raise exceptions.BackupNotFoundError()
-
-
-    for _ in BACKUP_DIR.iterdir():
-        file = _.name
-
-        if _.is_file(): shutil.copy2(_, file)
-
-        else: shutil.copytree(_, file, dirs_exist_ok=True)
-
-
-    return
+__all__ = [
+    'get_tags',
+    'get_next_tag',
+    'get_releases',
+    'get_new_releases',
+    'download_release',
+    'extract_release',
+    'install_release',
+    'create_backup',
+    'extract_backup_archive',
+    'install_backup',
+    'download_zip',
+    'extract_archive',
+    'zipdir'
+]

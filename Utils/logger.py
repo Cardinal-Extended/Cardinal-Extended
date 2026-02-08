@@ -1,21 +1,25 @@
 'В данном модуле написаны форматтеры для логгера.'
-from . import CLEAR_RE
-
-
 from logging import Formatter, LogRecord, PercentStyle
 from colorama import Fore, Back
+import re
 
 
-__all__ = [
-    'ColoredFormatter',
-    'FileFormatter'
-]
+CLEAR_RE = re.compile(r'(\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]))|(\n)|(\r)')
 
 
-class ColoredFormatter(Formatter): # TODO colorama only
+class ColoredFormatter(Formatter):
     def __init__(self):
         super(ColoredFormatter, self).__init__(datefmt='%Y-%m-%d %H:%M:%S')
-        self.log_level_colors = {'DEBUG': '\033[94m', 'INFO': '\033[92m', 'WARNING': '\033[93m', 'ERROR': '\033[91m', 'CRITICAL': '\033[95m'}
+
+
+        self.log_level_colors = {
+            'DEBUG': Fore.LIGHTBLUE_EX,
+            'INFO': Fore.LIGHTGREEN_EX,
+            'WARNING': Fore.LIGHTYELLOW_EX,
+            'ERROR': Fore.LIGHTRED_EX,
+            'CRITICAL': Fore.LIGHTMAGENTA_EX
+        }
+
         self.colors = {
             '$YELLOW': Fore.YELLOW,
             '$CYAN': Fore.CYAN,
@@ -52,7 +56,7 @@ class ColoredFormatter(Formatter): # TODO colorama only
         return super().format(record)
 
 
-class FileFormatter(Formatter): # TODO colorama only
+class FileFormatter(Formatter):
     def __init__(self):
         super().__init__(
             fmt='%(name)s: [%(levelname)s: %(asctime)s] %(message)s',
@@ -68,3 +72,9 @@ class FileFormatter(Formatter): # TODO colorama only
         record.msg = msg
 
         return super().format(record)
+
+
+__all__ = [
+    'ColoredFormatter',
+    'FileFormatter'
+]

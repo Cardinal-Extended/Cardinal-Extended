@@ -2,16 +2,11 @@
 import os
 
 
+from configs import VERSION_PATH
 from . import exceptions
 
 
 import requests
-
-
-__all__ = [
-    'check_proxy',
-    'set_console_title'
-]
 
 
 def check_proxy(proxy: dict) -> requests.Response:
@@ -45,3 +40,19 @@ def set_console_title(title: str) -> None:
 
 
     return
+
+
+def get_current_cardinal_version() -> str:
+    '''
+    Возвращает текущую версию программы.
+    '''
+    with open(VERSION_PATH, 'r') as fp: result = fp.read()
+
+    return result
+
+
+__all__ = [
+    'check_proxy',
+    'set_console_title',
+    'get_current_cardinal_version'
+]

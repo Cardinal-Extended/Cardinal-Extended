@@ -16,11 +16,6 @@ from . import (
 )
 
 
-__all__ = [
-    'Runner'
-]
-
-
 logger = logging.getLogger("FunPayAPI.runner")
 
 
@@ -398,7 +393,7 @@ class Runner:
                    OrdersListChangedEvent |
                    NewOrderEvent |
                    OrderStatusChangedEvent
-               ]:
+               ]: # TODO stop
         """
         Бесконечно отправляет запросы для получения новых событий.
 
@@ -434,3 +429,8 @@ class Runner:
                     sleep(rt)
             else:
                 sleep(requests_delay)
+
+
+__all__ = [
+    'Runner'
+]

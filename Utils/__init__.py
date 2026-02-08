@@ -1,14 +1,8 @@
-
-GITHUB_TAGS_URL = 'https://api.github.com/repos/Shiro-Okamoto/CardinalExtended/tags'
-GITHUB_RELEASES_URL = 'https://api.github.com/repos/Shiro-Okamoto/CardinalExtended/releases'
-
-
+'В данном модуле описаны различные типы, классы, методы, исключения и инструменты Кардинала.'
 import re
 
 ENTITY_RE = re.compile(r'\$photo=\d+|\$new|(\$sleep=(\d+\.\d+|\d+))')
 'Шаблон элемента (сущности) сообщения.'
-
-CLEAR_RE = re.compile(r'(\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]))|(\n)|(\r)')
 
 
 from . import exceptions
@@ -25,20 +19,25 @@ __all__ = [
     'exceptions',
     'Plugin',
     'Handler',
+    'Tag',
     'Release',
-    'CheckUpdatesResponse',
-    'CardinalManager',
-    'CheckUpdatesResponses',
-    'InstallUpdateResponses',
+    'CardinalWorker',
     'ColoredFormatter',
     'FileFormatter',
     'check_proxy',
     'set_console_title',
+    'get_current_cardinal_version',
+    'get_tags',
+    'get_next_tag',
+    'get_releases',
     'get_new_releases',
-    'download_zip',
-    'extract_update_archive',
+    'download_release',
+    'extract_release',
+    'install_release',
     'create_backup',
     'extract_backup_archive',
-    'install_release',
-    'install_backup'
+    'install_backup',
+    'download_zip',
+    'extract_archive',
+    'zipdir'
 ]

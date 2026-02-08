@@ -33,11 +33,6 @@ import re
 from typing import Literal, Any, Optional, IO
 
 
-__all__ = [
-    'Account'
-]
-
-
 logger = getLogger("FunPayAPI.account")
 PRIVATE_CHAT_ID_RE = re.compile(r"users-\d+-\d+$")
 
@@ -2364,3 +2359,8 @@ class Account:
             return int((int(x) - 0.5 if x else 1) * 3600)
         else:
             return 10
+
+
+__all__ = [
+    'Account'
+]

@@ -8,41 +8,62 @@ from pathlib import Path
 HOME_DIR = Path(__file__).parent.parent
 'Путь к папке Кардинала.'
 
+
 CONFIGS_DIR = HOME_DIR / 'configs'
 'Путь к папке с конфигами.'
 
 LOGGER_CONFIG_PATH = CONFIGS_DIR / 'logger_config.toml'
 'Путь к конфигу логгера.'
 
-LOGS_DIR = HOME_DIR / 'logs'
-'Путь к папке с логами.'
+DEFAULT_CARDINAL_CONFIG_PATH = CONFIGS_DIR / 'default_cardinal_config.toml'
+'Путь к папке со стандартными настройками Кардинала.'
 
-PATHS_CONFIG_PATH = CONFIGS_DIR / 'paths.toml'
-'Путь к конфигу кастомных путей Кардинала.'
 
 VERSION_PATH = HOME_DIR / 'VERSION'
 'Путь к версии Кардинала.'
 
 
+LOGS_DIR = HOME_DIR / 'logs'
+'Путь к папке с логами.'
+
+
+STORAGE_DIR = HOME_DIR / 'storage'
+'Путь к папке с кешем и т.д.'
+
+CACHE_DIR = STORAGE_DIR / 'cache'
+'Путь к папке с кешем.'
+
+UPDATE_DIR = CACHE_DIR / 'update'
+'Путь к папке со скачанным обновлением.'
+
+BACKUP_DIR = CACHE_DIR / 'backup'
+'Путь к папке с бекапами.'
+
+
+PLUGINS_DIR = HOME_DIR / 'plugins'
+'Путь к папке с плагинами.'
+
+
 from .config import *
-
-
-# ------------------------ Кастомные пути и директории ----------------------- #
-__paths_config = Config('PATHS')
-
-for __config_path_name in __paths_config.config: globals()[__config_path_name] = HOME_DIR.joinpath(str(__paths_config.config[__config_path_name]))
 
 
 __all__ = [
     'HOME_DIR',
+
     'CONFIGS_DIR',
     'LOGGER_CONFIG_PATH',
-    'PATHS_CONFIG_PATH',
+    'DEFAULT_CARDINAL_CONFIG_PATH',
+
     'VERSION_PATH',
-    'Config',
-    'SETTINGS_PATH',
+
+    'LOGS_DIR',
+
+    'STORAGE_DIR',
+    'CACHE_DIR',
+    'UPDATE_DIR',
+    'BACKUP_DIR',
+
+    'PLUGINS_DIR',
+
+    'Config'
 ]
-
-
-SETTINGS_PATH = CONFIGS_DIR / 'settings.toml'
-DEFAULT_SETTINGS_PATH = CONFIGS_DIR / 'default_settings.toml'

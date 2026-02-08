@@ -5,6 +5,7 @@
 
 
     "c_ext_getting_acc": "Получаю данные об аккаунте.",
+    "c_ext_acc_get_balance_get_error": "Не удалось загрузить данные об аккаунте: ошибка при получении баланса.",
     "c_ext_acc_get_timeout_err": "Не удалось загрузить данные об аккаунте: превышен тайм-аут ожидания.",
     "c_ext_acc_get_unexpected_err": "Произошла непредвиденная ошибка при получении данных аккаунта.",
 
@@ -18,11 +19,13 @@
     "c_ext_getting_profile_data": "Получаю данные о лотах и категориях.",
     "c_ext_profile_get_timeout_err": "Не удалось загрузить данные о лотах аккаунта: превышен тайм-аут ожидания.",
     "c_ext_profile_get_unexpected_err": "Произошла непредвиденная ошибка при получении данных о лотах и категориях.",
-    "c_ext_profile_get_too_many_attempts_err": "Произошло ошибка при получении данных о лотах и категориях: превышено кол-во попыток ({}).",
+    "c_ext_profile_get_too_many_attempts_err": "Произошла ошибка при получении данных о лотах и категориях: превышено кол-во попыток ({}).",
     "c_ext_profile_updated": "Обновил информацию о лотах $YELLOW({})$RESET и категориях $YELLOW({})$RESET профиля.",
 
 
     "c_ext_getting_balance": "Получаю баланс.",
+    "c_ext_get_balance_unexcepted_err": "Произошла непредвиденная ошибка при получении баланса.",
+    "c_ext_get_balance_too_many_attempts_err": "Произошла ошибка при получении баланса: превышено кол-во попыток ({}).",
 
 
     "c_ext_getting_plugins": "Получаю плагины.",
@@ -71,6 +74,7 @@
     "c_ext_session_unexpected_err": "Произошла непредвиденная ошибка при обновлении сессии.",
     "c_ext_session_no_more_attempts_err": "Не удалось обновить сессию: превышено кол-во попыток.",
     "c_ext_starting_session_loop": "$CYANЗапускаю цикл обновления сессии.",
+    "c_ext_session_update_error": "Не удалось обновить сессию.",
 
 
     "c_ext_starting_process_events_loop": "Запускаю обработчик событий.",
@@ -81,11 +85,21 @@
 
     "c_ext_checking_updates": "Проверяю наличие обновлений.",
     "c_ext_new_version_available": "Доступна новая версия: {}.",
-    "c_ext_check_updates_error": "Ошибка при проверке обновлений: {}",
+    "c_ext_new_prerelease_version_available": "Доступна новая версия (пре-релиз): {}.",
+    "c_ext_check_updates_error": "Ошибка при проверке обновлений.",
 
 
     "c_ext_starting_update": "Начинаю установку обновления.",
     "c_ext_update_error": "Не удалось установить обновление.",
+
+
+    "c_ext_downloading_release": "Скачиваю обновление Кардинала ({}).",
+    "c_ext_installing_release": "Устанавливаю обновление Кардинала ({}).",
+
+
+    "c_ext_request_failed_error_short_str": "Ошибка запроса к {} (Статус-код: {})",
+    "c_ext_request_failed_error": "Ошибка запроса к {} \nМетод: {} \nСтатус-код ответа: {} \nЗаголовки запроса: {} \nТело запроса: {} \nТекст ответа: {}",
+    "c_ext_unauthorized_error_short_str": "Не авторизирован (возможно, введен неверный golden_key?)",
 
 
     "c_ext_msg_sent": "Отправил сообщение в чат $YELLOW{}.",

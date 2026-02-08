@@ -2,19 +2,17 @@
 from __future__ import annotations
 
 
+from subprocess import Popen
 import importlib.util
 
 
-from typing import TYPE_CHECKING
-if TYPE_CHECKING: from importlib._bootstrap import ModuleSpec
-
-
 from Utils import (
-    ENTITY_RE, exceptions, check_proxy, set_console_title, Plugin, Handler, get_new_releases, CheckUpdatesResponses, CardinalManager, Release, CheckUpdatesResponse
+    ENTITY_RE, exceptions, check_proxy, set_console_title, Plugin, Handler, get_new_releases, get_current_cardinal_version, download_release, extract_release,
+    install_release, CardinalWorker
 )
 
 
-from configs import Config, VERSION_PATH
+from configs import Config, HOME_DIR
 
 
 from FunPayAPI import Account, Runner, EventTypes, SubCategoryTypes, Currencies, Message, LotShortcut, UserProfile, Balance, exceptions as fpapi_exceptions
@@ -37,9 +35,11 @@ from localizer import Localizer
 from threading import Thread
 
 
-__all__ = [
-    'Cardinal'
-]
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from importlib._bootstrap import ModuleSpec
+
+    from Utils import Release
 
 
 log = logging.getLogger('C_EXT')
@@ -90,10 +90,6 @@ class Cardinal:
         self.start_time = int(time())
 
 
-        self.cardinal_manager: CardinalManager = None
-        'Объект управляющего Кардиналом класса.'
-
-
         if self.config.proxy.enable: self.__init_proxy()
         else: self.proxy = {}
 
@@ -125,6 +121,18 @@ class Cardinal:
         'Курс валют {(валюта1, валюта2): (курс, время обновления)}'
 
 
+        self.update_session_worker: CardinalWorker = None
+        'Обработчик обновления сессии.'
+        self.update_session_worker_running: bool = False
+        'Флаг запущенного бесконечного цикла обновления сессии.'
+
+
+        self.check_updates_worker: CardinalWorker = None
+        'Обработчик проверки обновлений Кардинала.'
+        self.check_updates_worker_running: bool = False
+        'Флаг запущенного бесконечного цикла проверки обновлений Кардинала.'
+
+
         self.event_var_names = [
             'PRE_INIT', # Функции, выполняемые до инициализации Кардинала (после загрузки плагинов).
             'POST_INIT', # Функции, выполняемые после инициализации Кардинала.
@@ -141,7 +149,21 @@ class Cardinal:
             'ORDERS_LIST_CHANGED', # Функции, выполняемые при изменении списка заказов или их статусов.
             'ORDER_STATUS_CHANGED', # Функции, выполняемые при изменении статуса заказа.
             'PROFILE_UPDATE_SUCCESS', # Функции, выполняемые при успешном обновлении профиля.
-            'HANDLER_ERROR' # Функции, выполняемые при ошибке выполнения хендлера (могут вызвать бесконечную рекурсию).
+            'HANDLER_ERROR', # Функции, выполняемые при ошибке выполнения хендлера (могут вызвать бесконечную рекурсию).
+            'SESSION_UPDATE_SUCCESS', # Функции, выполняемые при успешном обновлении сессии.
+            'SESSION_UPDATE_ERROR,' # Функции, выполняемые при ошибке обновления сессии.
+            'GET_BALANCE_SUCCESS', # Функции, выполняемые при успешном получении баланса аккаунта.
+            'PRE_INIT_ACCOUNT', # Функции, выполняемые перед инициализацией (получением) аккаунта.
+            'POST_INIT_ACCOUNT', # Функции, выполняемые после инициализации (получения) аккаунта и баланса.
+            'NEW_PRE_RELEASE_VERSION_AVAILABLE', # Функции, выполняемые, когда Кардинал находит новую пре-релизную версию, но авто-загрузка отключена.
+            'NEW_VERSION_AVAILABLE', # Функции, выполняемые, когда Кардинал находит новую версию, но авто-загрузка отключена.
+            'PRE_UPDATE', # Функции, выполняемые перед началом обновления программы.
+            'UPDATE_ERROR', # Функции, выполняемые в случае ошибки обновления.
+            'POST_UPDATE', # Функции, выполняемые после обновления программы.
+            'PRE_DOWNLOAD_RELEASE', # Функции, выполняемые перед скачиванием обновления.
+            'POST_DOWNLOAD_RELEASE', # Функции, выполняемые после скачивания обновления.
+            'PRE_INSTALL_RELEASE', # Функции, выполняемые перед установкой обновления.
+            'POST_INSTALL_RELEASE', # Функции, выполняемые после успешной установки обновления.
         ]
         'Имена событий для привязки хендлеров.'
 
@@ -161,7 +183,21 @@ class Cardinal:
             'ORDERS_LIST_CHANGED',
             'ORDER_STATUS_CHANGED',
             'PROFILE_UPDATE_SUCCESS',
-            'HANDLER_ERROR'
+            'HANDLER_ERROR',
+            'SESSION_UPDATE_SUCCESS',
+            'SESSION_UPDATE_ERROR',
+            'GET_BALANCE_SUCCESS',
+            'PRE_INIT_ACCOUNT',
+            'POST_INIT_ACCOUNT',
+            'NEW_PRE_RELEASE_VERSION_AVAILABLE',
+            'NEW_VERSION_AVAILABLE',
+            'PRE_UPDATE',
+            'UPDATE_ERROR',
+            'POST_UPDATE',
+            'PRE_DOWNLOAD_RELEASE',
+            'POST_DOWNLOAD_RELEASE',
+            'PRE_INSTALL_RELEASE',
+            'POST_INSTALL_RELEASE',
         ] | str, list[Handler]] = {}
         'Список загруженных хендлеров.'
 
@@ -175,7 +211,7 @@ class Cardinal:
 
     def __init_proxy(self) -> None:
         if self.config.proxy.ip and self.config.proxy.port.isnumeric():
-            log.info(self.__translate('c_ext_proxy_detected'))
+            log.info(self.translate('c_ext_proxy_detected'))
 
             ip = self.config.proxy.ip
             port = self.config.proxy.port
@@ -192,31 +228,34 @@ class Cardinal:
 
 
             if self.config.proxy.check:
-                log.info(self.__translate('c_ext_checking_proxy'))
+                log.info(self.translate('c_ext_checking_proxy'))
 
                 try: response = check_proxy(self.proxy)
 
                 except:
-                    log.error(self.__translate('c_ext_proxy_err'))
+                    log.error(self.translate('c_ext_proxy_err'))
                     log.debug('TRACEBACK', exc_info=True)
 
 
                     return
 
 
-            log.info(self.__translate('c_ext_proxy_success', response.content.decode()))
+            log.info(self.translate('c_ext_proxy_success', response.content.decode()))
 
 
         return
 
 
+    # ---------------------------------------------------------------------------- #
+    #                             Управление процессом                             #
+    # ---------------------------------------------------------------------------- #
     def init(self):
         '''
         Инициализирует Кардинал.
 
         Загружает плагины, регистрирует хэндлеры, получает данные аккаунта и профиля.
         '''
-        log.info(self.__translate('c_ext_initializing_cardinal'))
+        log.info(self.translate('c_ext_initializing_cardinal'))
 
 
         self.get_plugins()
@@ -235,6 +274,27 @@ class Cardinal:
         self.__update_profile()
 
 
+        self.session_update_worker = CardinalWorker(
+            self,
+            self.update_session,
+            'update_session_worker_running',
+            True,
+            foo_args=(3,)
+        )
+
+        self.update_session_worker_running: bool = False
+
+
+        self.check_updates_worker = CardinalWorker(
+            self,
+            self.__check_updates,
+            'check_updates_worker_running',
+            True
+        )
+
+        self.check_updates_worker_running: bool = False
+
+
         self.run_handlers(self.handlers.get('POST_INIT', []))
 
 
@@ -246,10 +306,12 @@ class Cardinal:
     def start(self):
         '''
         Запускает Кардинал.
-        '''
-        log.info(self.__translate('c_ext_starting_cardinal'))
 
-        if not self.initiated: raise Exception('Кардинал должен быть инициализирован перед запуском!') # TODO Custom exception
+        :raises CardinalNotInitializedException: Кардинал не был инициализирован перед запуском.
+        '''
+        log.info(self.translate('c_ext_starting_cardinal'))
+
+        if not self.initiated: raise exceptions.CardinalNotInitializedError()
 
 
         self.start_time = int(time())
@@ -262,9 +324,8 @@ class Cardinal:
         self.run_handlers(self.handlers.get('POST_START', []))
 
 
-        Thread(target=self.update_session_loop, daemon=True).start()
-
-        Thread(target=self.check_cardinal_updates_loop, daemon=True).start()
+        Thread(target=self.session_update_worker.run, daemon=True).start()
+        Thread(target=self.check_updates_worker.run, daemon=True).start()
 
 
         self.process_events()
@@ -274,10 +335,13 @@ class Cardinal:
         '''
         Останавливает Кардинал.
         '''
-        log.info(self.__translate('c_ext_stopping_cardinal'))
+        log.info(self.translate('c_ext_stopping_cardinal'))
 
         self.run_handlers(self.handlers.get('PRE_STOP', []))
 
+
+        self.session_update_worker.stop()
+        self.check_updates_worker.stop()
 
         self.run_id += 1
 
@@ -285,67 +349,95 @@ class Cardinal:
         self.run_handlers(self.handlers.get('POST_STOP', []))
 
 
-    def update_session(self, attempts: int = 3) -> bool: # TODO Raise custom Exception instead of boolean return
+    def full_stop(self) -> NoReturn:
+        '''
+        Полностью останавливает программу.
+        '''
+        self.stop()
+
+        exit('Запланированное закрытие программы')
+
+
+    def full_reload(self) -> NoReturn:
+        '''
+        Полностью перезапускает программу.
+        '''
+        Popen(str(HOME_DIR / 'main.py'), shell=True)
+
+        self.full_stop()
+
+
+    def update_session(self, attempts: int = 3) -> Literal[60, 3600]:
         '''
         Обновляет данные аккаунта (баланс, токены и т.д.)
 
-        :param attempts: кол-во попыток.
-
-        :return: True, если удалось обновить данные, False - если нет.
+        :param attempts: Кол-во попыток, defaults to 3.
+        :type attempts: int, optional
+        :return: Время (в секундах) для следующего вызова (в бесконечном цикле): 60, если не удалось получить данные аккаунта, иначе 3600.
+        :rtype: int
         '''
-        log.info(self.__translate('c_ext_updating_session'))
+        log.info(self.translate('c_ext_updating_session'))
 
         for _ in range(attempts):
             try:
                 self.account.get(update_phpsessid=True)
 
-                log.info(self.__translate('c_ext_session_updated'))
-                return True
 
-            except TimeoutError: log.warning(self.__translate('c_ext_session_timeout_err'))
+                log.info(self.translate('c_ext_session_updated'))
 
-            except (fpapi_exceptions.UnauthorizedError, fpapi_exceptions.RequestFailedError) as e: # TODO
-                log.error(e.short_str)
-                log.debug(e)
+                self.run_handlers(self.handlers.get('SESSION_UPDATE_SUCCESS', []))
+
+
+                return 60*60
+
+
+            except TimeoutError: log.warning(self.translate('c_ext_session_timeout_err'))
+
+            except fpapi_exceptions.UnauthorizedError as err:
+                log.error(self.translate('c_ext_unauthorized_error_short_str'))
+                log.debug(
+                    self.translate(
+                        'c_ext_request_failed_error',
+                        err.url, err.response.request.method, err.status_code, err.request_headers, err.request_body, err.response.text
+                    )
+                )
+
+            except fpapi_exceptions.RequestFailedError as err:
+                log.error(self.translate('c_ext_request_failed_error_short_str', err.url, err.status_code))
+                log.debug(
+                    self.translate(
+                        'c_ext_request_failed_error',
+                        err.url, err.response.request.method, err.status_code, err.request_headers, err.request_body, err.response.text
+                    )
+                )
 
             except:
-                log.error(self.__translate('c_ext_session_unexpected_err'))
+                log.error(self.translate('c_ext_session_unexpected_err'))
                 log.debug('TRACEBACK', exc_info=True)
 
 
-            log.warning(self.__translate('c_ext_try_again_in_n_secs', 2))
+            log.warning(self.translate('c_ext_try_again_in_n_secs', 2))
+
+
             sleep(2)
+
+            continue
 
 
         else:
-            log.error(self.__translate('c_ext_session_no_more_attempts_err'))
-            return False
+            log.error(self.translate('c_ext_session_no_more_attempts_err'))
 
-
-    def get_balance(self, attempts: int = 3) -> Balance:
-        log.info(self.__translate('c_ext_getting_balance'))
-
-        subcategories = self.account.get_sorted_subcategories()[SubCategoryTypes.COMMON]
-
-
-        for _ in range(attempts): # TODO Move attempts to whole function
-            subcat_id = random.choice(list(subcategories.keys()))
-
-            lots = self.account.get_subcategory_public_lots(SubCategoryTypes.COMMON, subcat_id)
-
-
-            if lots: break
-
-        else: raise Exception(...) # TODO
-
-
-        balance = self.account.get_balance(random.choice(lots).id) # TODO Fix empty lots list
-
-        return balance
+            return 60
 
 
     def __init_account(self) -> None:
-        log.info(self.__translate('c_ext_getting_acc'))
+        '''
+        Инициализирует аккаунт.
+        '''
+        log.info(self.translate('c_ext_getting_acc'))
+
+        self.run_handlers(self.handlers.get('PRE_INIT_ACCOUNT', []))
+
 
         while True:
             try:
@@ -362,32 +454,55 @@ class Cardinal:
 
                 break
 
-            except TimeoutError: log.error(self.__translate('c_ext_acc_get_timeout_err'))
+            except TimeoutError: log.error(self.translate('c_ext_acc_get_timeout_err'))
 
-            except (fpapi_exceptions.UnauthorizedError, fpapi_exceptions.RequestFailedError) as e: # TODO
-                log.error(e.short_str())
-                log.debug(f'TRACEBACK {e.short_str()}')
+            except fpapi_exceptions.UnauthorizedError as err:
+                log.error(self.translate('c_ext_unauthorized_error_short_str'))
+                log.debug(
+                    self.translate(
+                        'c_ext_request_failed_error',
+                        err.url, err.response.request.method, err.status_code, err.request_headers, err.request_body, err.response.text
+                    )
+                )
+
+            except fpapi_exceptions.RequestFailedError as err:
+                log.error(self.translate('c_ext_request_failed_error_short_str', err.url, err.status_code))
+                log.debug(
+                    self.translate(
+                        'c_ext_request_failed_error',
+                        err.url, err.response.request.method, err.status_code, err.request_headers, err.request_body, err.response.text
+                    )
+                )
+
+            except exceptions.GetBalanceError: log.error(self.translate('c_ext_acc_get_balance_get_error'))
 
             except:
-                log.error(self.__translate('c_ext_acc_get_unexpected_err'))
+                log.error(self.translate('c_ext_acc_get_unexpected_err'))
                 log.debug('TRACEBACK', exc_info=True)
 
 
-            log.warning(self.__translate('c_ext_try_again_in_n_secs', 2))
+            log.warning(self.translate('c_ext_try_again_in_n_secs', 2))
 
             sleep(2)
 
 
-    def __update_profile(self, infinite_polling: bool = True, attempts: int = 3) -> bool: # TODO Raise custom Exception instead of boolean return
+        self.run_handlers(self.handlers.get('POST_INIT_ACCOUNT', []))
+
+
+        return
+
+
+    def __update_profile(self, infinite_polling: bool = True, attempts: int = 3) -> None:
         '''
         Обновляет профиль FunPay.
 
-        :param infinite_polling: Бесконечно посылать запросы, пока не будет получен ответ (игнорировать макс. кол-во попыток)
-        :param attempts: Максимальное кол-во попыток.
-
-        :return: True, если информация обновлена, False, если превышено макс. кол-во попыток.
+        :param infinite_polling: Бесконечно посылать запросы, пока не будет получен ответ (игнорировать макс. кол-во попыток), defaults to True.
+        :type infinite_polling: bool, optional
+        :param attempts: Максимальное кол-во попыток, defaults to 3.
+        :type attempts: int, optional
+        :raises exceptions.ProfileUpdateError: Не удалось обновить профиль.
         '''
-        log.info(self.__translate('c_ext_getting_profile_data'))
+        log.info(self.translate('c_ext_getting_profile_data'))
 
 
         _ = attempts
@@ -397,45 +512,46 @@ class Cardinal:
                 self.profile = self.account.get_user(self.account.id)
                 break
 
-            except TimeoutError: log.error(self.__translate('c_ext_profile_get_timeout_err'))
+            except TimeoutError: log.error(self.translate('c_ext_profile_get_timeout_err'))
 
             except fpapi_exceptions.RequestFailedError as e:
                 log.error(e.short_str())
                 log.debug(e)
 
             except:
-                log.error(self.__translate('c_ext_profile_get_unexpected_err'))
+                log.error(self.translate('c_ext_profile_get_unexpected_err'))
                 log.debug('TRACEBACK', exc_info=True)
 
 
             _-=1
 
-            log.warning(self.__translate('c_ext_try_again_in_n_secs', 2))
+            log.warning(self.translate('c_ext_try_again_in_n_secs', 2))
 
             sleep(2)
 
 
         else:
-            log.error(self.__translate('c_ext_profile_get_too_many_attempts_err', attempts))
-            return False
+            log.error(self.translate('c_ext_profile_get_too_many_attempts_err', attempts))
+
+            raise exceptions.ProfileUpdateError()
 
 
         self.lot_shortcuts = self.profile.lots
         self.lot_ids = [i.id for i in self.lot_shortcuts]
-        log.info(self.__translate('c_ext_profile_updated', len(self.lot_shortcuts), len(self.profile.sorted_by_subcategory_lots)))
+        log.info(self.translate('c_ext_profile_updated', len(self.lot_shortcuts), len(self.profile.sorted_by_subcategory_lots)))
 
 
         self.run_handlers(self.handlers.get('PROFILE_UPDATE_SUCCESS', []))
 
 
-        return True
+        return
 
 
-    def process_events(self) -> NoReturn: # TODO Add Worker subclass
+    def process_events(self) -> NoReturn:
         '''
-        Запускает хэндлеры, привязанные к тому или иному событию.
+        Бесконечно получает события FunPay и запускает связанные хендлеры.
         '''
-        log.info(self.__translate('c_ext_starting_process_events_loop'))
+        log.info(self.translate('c_ext_starting_process_events_loop'))
 
         self.process_events_loop_running = True
 
@@ -447,144 +563,188 @@ class Cardinal:
         }
 
 
-        for event in self.runner.listen(requests_delay=int(self.config.Other.requestsDelay)): # add stop function to Runner
-            if instance_id != self.run_id:
-                self.process_events_loop_running = False
+        try:
+            for event in self.runner.listen(requests_delay=int(self.config.Other.requestsDelay)):
+                if instance_id != self.run_id:
+                    self.process_events_loop_running = False
 
-                break
-
-
-            self.run_handlers(self.handlers.get(event_handlers[event.type], []), event)
+                    break
 
 
-    def update_session_loop(self) -> NoReturn: # TODO Add Worker subclass
+                self.run_handlers(self.handlers.get(event_handlers[event.type], []), event)
+
+
+        except StopIteration: return
+
+
+    # ---------------------------------------------------------------------------- #
+    #                                  Обновления                                  #
+    # ---------------------------------------------------------------------------- #
+    def __check_updates(self) -> int | Literal[60]:
         '''
-        Запускает бесконечный цикл обновления данных о пользователе.
+        Проверяет наличие обновлений. Автоматически обновляет и перезапускает Кардинал, если включены соответствующие настройки.
+
+        :return: Задержка (в секундах) для следующей проверки обновлений (для бесконечного цикла). 60 при ошибке, иначе значение из конфига.
+        :rtype: int
         '''
-        log.info(self.__translate('c_ext_starting_session_loop'))
+        try:
+            # ----------------------- Проверяем наличие обновлений ----------------------- #
+            releases = self.check_updates()
 
-        instance_id = self.run_id
-
-        self.update_session_loop_running = True
-
-        next_update_time = int(time())
-
-        while True:
-            sleep(1)
-
-            if instance_id != self.run_id:
-                self.update_session_loop_running = False
-
-                break
-
-
-            result = None
-
-            if next_update_time <= int(time()): result = self.update_session()
-
-            if not result:
-                next_update_time = int(time()) + 60
-
-                continue
-
-            next_update_time = int(time()) + 3600
-
-
-    def check_cardinal_updates_loop(self) -> NoReturn: # TODO Add Worker subclass
-        '''
-        Запускает бесконечный цикл проверки обновлений Кардинала. Автоматически обновляет и перезапускает Кардинал, если включены соответствующие настройки.
-        '''
-        log.info(self.__translate('c_ext_starting_check_cardinal_updates_loop'))
-
-        instance_id = self.run_id
-
-        self.check_cardinal_updates_loop_running = True
-
-        next_check_time = int(time())
-
-        while True:
-            sleep(1)
-
-            if instance_id != self.run_id:
-                self.check_cardinal_updates_loop_running = False
-
-                break
-
-
-            if not self.config.check_for_updates: continue
-
-
-            if next_check_time > int(time()): continue
-
-
-            result = self.check_updates()
-
-            if result.response is CheckUpdatesResponses.CARDINAL_IS_UP_TO_DATE:
-                log.info(f'{result.response.value}.')
-
-                next_check_time = int(time()) + self.config.check_for_updates_delay
-
-                continue
-
-
-            if result.response is CheckUpdatesResponses.UPDATE_AVAILABLE:
+            # ------------------------ Если найдены новые релизы, ------------------------ #
+            if releases:
+                # ---------------------- но авто-обновление выключено - ---------------------- #
                 if not self.config.auto_update:
-                    for release in result.releases:
-                        log.info(self.__translate('c_ext_new_version_available', release.sources_link))
+                    # --------------- отправляем уведомления о наличии новых версий -------------- #
+                    for release in releases:
+                        if release.prerelease:
+                            log.info(self.translate('c_ext_new_prerelease_version_available', release.tag_name))
 
-                        next_check_time = int(time()) + self.config.check_for_updates_delay
-
-                        continue
-
-
-                self.update(result.releases[-1])
+                            self.run_handlers(self.handlers.get('NEW_PRE_RELEASE_VERSION_AVAILABLE', []), [release])
 
 
-                next_check_time = int(time()) + self.config.check_for_updates_delay
+                            continue
 
-                continue
+                        log.info(self.translate('c_ext_new_version_available', release.tag_name))
 
-
-            log.warning(self.__translate('c_ext_check_updates_error', result.response.value))
-
-            next_check_time = int(time()) + 60
-
-            continue
+                        self.run_handlers(self.handlers.get('NEW_VERSION_AVAILABLE', []), [release])
 
 
-    def check_updates(self) -> CheckUpdatesResponse:
-        log.debug(self.__translate('c_ext_checking_updates'))
-
-        result = get_new_releases(self.__cardinal_package_version)
+                    return self.config.check_for_updates_delay
 
 
-        return result
-    
+                release = releases[0]
 
-    def update(self, release: Release) -> None:
+                # --------- это не пре-релиз или включено обновление до пре-релиза - --------- #
+                if any([
+                    not release.prerelease,
+                    self.config.install_prereleases
+                ]):
+                    # ---------------------------- обновляем Кардинал ---------------------------- #
+                    self.update(release)
+
+
+                    return self.config.check_for_updates_delay
+
+
+                # --------- но это пре-релиз, а обновление до пре-релиза выключено - --------- #
+                # ---------------- отправляем уведомление о наличии пре-релиза --------------- #
+                log.info(self.translate('c_ext_new_prerelease_version_available', release.tag_name))
+
+                self.run_handlers(self.handlers.get('NEW_PRE_RELEASE_VERSION_AVAILABLE', []), [release])
+
+
+                return self.config.check_for_updates_delay
+
+
+        # ---------- Ошибка при обновлении - повторяем попытку через минуту ---------- #
+        except:
+            log.warning(self.translate('c_ext_check_updates_error'))
+            log.debug('TRACEBACK', exc_info=True)
+
+
+            log.warning(self.translate('c_ext_try_again_in_n_secs', 60))
+
+
+            return 60
+
+
+    def check_updates(self) -> list[Release] | None:
+        '''
+        Проверяет наличие обновлений программы.
+
+        :raises Exception: В конфиге отсутствует ссылка на GitHub.
+        :return: Список релизов.
+        :rtype: list[Release] | None
+        '''
+        log.debug(self.translate('c_ext_checking_updates'))
+
+        if not self.config.github_api_page_url: raise exceptions.GitHubAPIUrlNotSpecified()
+
+
+        releases = get_new_releases(get_current_cardinal_version(), self.config.github_api_page_url)
+
+
+        return releases
+
+
+    def update(self, release: Release) -> NoReturn: # TODO Варианты действий в зависимости от ошибки
         '''
         Обновляет и полностью перезапускает Кардинал.
 
         :param release: Информация об обновлении.
         :type release: Release
         '''
-        log.info(self.__translate('c_ext_starting_update'))
+        log.info(self.translate('c_ext_starting_update'))
+
+        self.run_handlers(self.handlers.get('PRE_UPDATE', []), [release])
+
 
         try:
-            if not getattr(self, 'cardinal_manager', None): raise KeyError('Отсутствует CardinalManager')
+            folder_name = self.__download_release(release)
 
-            self.cardinal_manager.create_cardinal_backup(self.name)
-
-
-            self.cardinal_manager.update_cardinal(release)
+            self.__install_release(folder_name)
 
 
-            self.cardinal_manager.restart_cardinal(self.name)
+        except Exception as err:
+            log.error(self.translate('c_ext_update_error'))
+
+            self.run_handlers(self.handlers.get('UPDATE_ERROR', []), [release, err])
 
 
-        except:
-            log.error(self.__translate('c_ext_update_error'))
-            log.debug('TRACEBACK', exc_info=True)
+            return
+
+
+        self.run_handlers(self.handlers.get('POST_UPDATE', []), [release])
+
+
+        self.full_reload()
+
+
+    def __download_release(self, release: Release) -> str:
+        '''
+        Скачивает и распаковывает обновление.
+
+        :param release: Релиз.
+        :type release: Release
+        :return: Имя папки скачанного релиза
+        :rtype: str
+        '''
+        log.info(self.translate('c_ext_downloading_release', release.tag_name))
+
+        self.run_handlers(self.handlers.get('PRE_DOWNLOAD_RELEASE', []), [release])
+
+
+        download_release(release)
+
+        folder_name = extract_release()
+
+
+        self.run_handlers(self.handlers.get('POST_DOWNLOAD_RELEASE', []), [release])
+
+
+        return folder_name
+
+
+    def __install_release(self, folder_name: str) -> None:
+        '''
+        Устанавливает обновление.
+
+        :param folder_name: Имя папки с обновлением.
+        :type folder_name: str
+        :raises InstallUpdateError: Не удалось установить обновление.
+        '''
+        log.info(self.translate('c_ext_installing_release', folder_name))
+
+        self.run_handlers(self.handlers.get('PRE_INSTALL_RELEASE', []))
+
+        try: install_release(folder_name)
+
+
+        except: raise exceptions.InstallUpdateError()
+
+
+        self.run_handlers(self.handlers.get('POST_INSTALL_RELEASE', []))
 
 
         return
@@ -597,7 +757,7 @@ class Cardinal:
     # ----------------------------- Загрузка плагинов ---------------------------- #
     def get_plugins(self) -> None:
         'Получает все плагины из папки plugins. Не импортирует модули.'
-        log.debug(self.__translate('c_ext_getting_plugins'))
+        log.debug(self.translate('c_ext_getting_plugins'))
 
         plugins_count = 0
         plugin_dirs = (Path(__file__).parent / 'plugins').iterdir()
@@ -625,7 +785,7 @@ class Cardinal:
             self.plugins[plugin.uuid] = plugin
             plugins_count+=1
 
-        log.debug(self.__translate('c_ext_getting_plugins_success', plugins_count))
+        log.debug(self.translate('c_ext_getting_plugins_success', plugins_count))
 
         return
 
@@ -662,7 +822,7 @@ class Cardinal:
 
     def load_plugins(self) -> None:
         'Загружает плагины, полученные через get_plugins.'
-        log.debug(self.__translate('c_ext_loading_plugins'))
+        log.debug(self.translate('c_ext_loading_plugins'))
 
         plugins_raw_info = {plugin.uuid: plugin.raw_info for plugin in self.plugins.values()}
 
@@ -679,18 +839,18 @@ class Cardinal:
                 plugins_count+=1
 
             except exceptions.PluginNotTrustedException:
-                log.warning(self.__translate('c_ext_plugin_is_not_trusted_err', plugin_uuid))
+                log.warning(self.translate('c_ext_plugin_is_not_trusted_err', plugin_uuid))
 
             except exceptions.PluginDependenciesNotLoadedError:
-                log.error(self.__translate('c_ext_plugin_dependencies_not_loaded_err', plugin_uuid))
+                log.error(self.translate('c_ext_plugin_dependencies_not_loaded_err', plugin_uuid))
                 log.debug('TRACEBACK', exc_info=True)
 
             except:
-                log.error(self.__translate('c_ext_plugin_load_error', plugin_uuid))
+                log.error(self.translate('c_ext_plugin_load_error', plugin_uuid))
                 log.debug('TRACEBACK', exc_info=True)
 
 
-        log.debug(self.__translate('c_ext_loading_plugins_success', plugins_count))
+        log.debug(self.translate('c_ext_loading_plugins_success', plugins_count))
 
         return
 
@@ -780,13 +940,13 @@ class Cardinal:
         :param plugins_raw_info: Информация о плагинах.
         :type plugins_raw_info: dict
         '''
-        log.debug(self.__translate('c_ext_getting_plugins_load_order'))
+        log.debug(self.translate('c_ext_getting_plugins_load_order'))
 
         self.plugins_load_order = list(plugins_raw_info)
 
         self.plugins_load_order.sort(key=lambda u: plugins_raw_info[u]['load_order'])
 
-        log.debug(self.__translate('c_ext_getting_plugins_load_order_success', self.plugins_load_order))
+        log.debug(self.translate('c_ext_getting_plugins_load_order_success', self.plugins_load_order))
 
 
     def load_plugin(self, plugin_uuid: str):
@@ -803,7 +963,7 @@ class Cardinal:
         plugin = self.plugins[plugin_uuid]
 
 
-        log.debug(self.__translate('c_ext_loading_plugin', plugin.name, plugin.uuid))
+        log.debug(self.translate('c_ext_loading_plugin', plugin.name, plugin.uuid))
 
         if all([
             not self.config.plugins.load_all_plugins,
@@ -820,29 +980,29 @@ class Cardinal:
 
 
         if hasattr(plugin.module, 'LOAD_PLUGIN'):
-            log.debug(self.__translate('c_ext_running_load_plugin_handlers', plugin.name, plugin.uuid))
+            log.debug(self.translate('c_ext_running_load_plugin_handlers', plugin.name, plugin.uuid))
 
             init_plugin_handlers = [Handler(plugin.uuid, 'LOAD_PLUGIN', 0, func) for func in getattr(plugin.module, 'LOAD_PLUGIN')]
 
             self.run_handlers(init_plugin_handlers)
 
 
-        log.debug(self.__translate('c_ext_plugin_load_success', plugin.name, plugin.uuid))
+        log.debug(self.translate('c_ext_plugin_load_success', plugin.name, plugin.uuid))
 
         return
 
 
     def init_plugins(self):
         'Инициализирует все загруженные плагины.'
-        log.debug(self.__translate('c_ext_initializing_plugins', len(self.plugins)))
+        log.debug(self.translate('c_ext_initializing_plugins', len(self.plugins)))
 
         for plugin in self.plugins.values():
             try: self.init_plugin(plugin, self.event_var_names)
             except:
-                log.error(self.__translate('c_ext_initializing_plugin_err', plugin.name, plugin.uuid))
+                log.error(self.translate('c_ext_initializing_plugin_err', plugin.name, plugin.uuid))
                 log.debug('TRACEBACK', exc_info=True)
 
-        log.info(self.__translate('c_ext_initializing_plugins_success'))
+        log.info(self.translate('c_ext_initializing_plugins_success'))
 
 
     def init_plugin(self, plugin: Plugin, event_var_names: list[str]):
@@ -854,11 +1014,11 @@ class Cardinal:
         :param event_var_names: Список алиасов хендлеров.
         :type event_var_names: list[str]
         '''
-        log.debug(self.__translate('c_ext_initializing_plugin', plugin.name, plugin.uuid))
+        log.debug(self.translate('c_ext_initializing_plugin', plugin.name, plugin.uuid))
 
 
         if hasattr(plugin.module, 'INIT_PLUGIN'):
-            log.debug(self.__translate('c_ext_running_init_plugin_handlers', plugin.name, plugin.uuid))
+            log.debug(self.translate('c_ext_running_init_plugin_handlers', plugin.name, plugin.uuid))
             init_plugin_handlers = [
                 Handler(
                     plugin.uuid,
@@ -872,7 +1032,7 @@ class Cardinal:
 
         for event_name in event_var_names:
             if hasattr(plugin.module, event_name):
-                log.debug(self.__translate('c_ext_getting_plugin_handlers', event_name, getattr(plugin.module, event_name), plugin.uuid))
+                log.debug(self.translate('c_ext_getting_plugin_handlers', event_name, getattr(plugin.module, event_name), plugin.uuid))
 
                 for handler_value in getattr(plugin.module, event_name):
                     handler = Handler(
@@ -887,7 +1047,7 @@ class Cardinal:
 
     def add_handlers_from_plugins(self):
         'Добавляет хендлеры из всех загруженных плагинов.'
-        log.debug(self.__translate('c_ext_adding_plugins_handlers', len(self.plugins)))
+        log.debug(self.translate('c_ext_adding_plugins_handlers', len(self.plugins)))
 
         for plugin in self.plugins.values(): self.add_handlers_from_plugin(plugin)
 
@@ -899,10 +1059,10 @@ class Cardinal:
         :param plugin: Плагин.
         :type plugin: Plugin
         '''
-        log.debug(self.__translate('c_ext_adding_plugin_handlers', plugin.name, plugin.uuid))
+        log.debug(self.translate('c_ext_adding_plugin_handlers', plugin.name, plugin.uuid))
 
         for event_name, handlers in plugin.handlers.items():
-            log.debug(self.__translate('c_ext_adding_event_handlers', event_name, handlers, plugin.uuid))
+            log.debug(self.translate('c_ext_adding_event_handlers', event_name, handlers, plugin.uuid))
             for handler in handlers: self.add_handler(handler, event_name)
 
 
@@ -915,7 +1075,7 @@ class Cardinal:
         :param event_var_name: Алиас события хендлера.
         :type event_var_name: str
         '''
-        log.debug(self.__translate('c_ext_adding_handler', handler.func.__name__, handler.plugin_uuid, event_var_name))
+        log.debug(self.translate('c_ext_adding_handler', handler.func.__name__, handler.plugin_uuid, event_var_name))
 
         self.handlers[event_var_name] = [*self.handlers.get(event_var_name, []), handler]
 
@@ -930,7 +1090,7 @@ class Cardinal:
         handlers.sort(key=lambda h: h.priority if h.priority >= 0 else inf)
 
 
-        log.debug(self.__translate('c_ext_running_handlers', handlers, args, kwargs))
+        log.debug(self.translate('c_ext_running_handlers', handlers, args, kwargs))
 
         for handler in handlers: self.run_handler(handler, *args, **kwargs)
 
@@ -942,12 +1102,12 @@ class Cardinal:
         :param handler: Хендлер.
         :type handler: Handler
         '''
-        log.debug(self.__translate('c_ext_running_handler', getattr(handler.func, __name__, handler.plugin_uuid), args, kwargs))
+        log.debug(self.translate('c_ext_running_handler', getattr(handler.func, __name__, handler.plugin_uuid), args, kwargs))
 
         try: handler.func(self, *args, **kwargs)
 
         except:
-            log.warning(self.__translate('c_ext_running_handler_err', getattr(handler.func, __name__, handler.plugin_uuid)))
+            log.warning(self.translate('c_ext_running_handler_err', getattr(handler.func, __name__, handler.plugin_uuid)))
             log.debug(f'args={args} \nkwargs={kwargs}')
             log.debug('TRACEBACK', exc_info=True)
 
@@ -957,6 +1117,83 @@ class Cardinal:
     # ---------------------------------------------------------------------------- #
     #                               Методы FunPayAPI                               #
     # ---------------------------------------------------------------------------- #
+    def get_balance(self, attempts: int = 3) -> Balance:
+        '''
+        Получает информацию о балансе.
+
+        :param attempts: Кол-во попыток, defaults to 3.
+        :type attempts: int, optional
+        :raises GetBalanceError: Не удалось получить баланс.
+        :return: Баланс.
+        :rtype: Balance
+        '''
+        def choice_random_lot() -> LotShortcut | None:
+            '''
+            Возвращает случайный лот из случайной категории для проверки баланса
+
+            :return: Виджет лота.
+            :rtype: LotShortcut | None
+            '''
+            for _ in range(3):
+                subcat_id = random.choice(list(subcategories.keys()))
+
+                lots = self.account.get_subcategory_public_lots(SubCategoryTypes.COMMON, subcat_id)
+
+
+                if lots: break
+
+            else: return
+
+            return random.choice(lots)
+
+
+        log.info(self.translate('c_ext_getting_balance'))
+
+        for _ in range(attempts):
+            try:
+                subcategories = self.account.get_sorted_subcategories()[SubCategoryTypes.COMMON]
+
+
+                lot = choice_random_lot()
+
+                if not lot: continue
+
+
+                balance = self.account.get_balance(lot.id)
+
+
+                break
+
+
+            except:
+                log.warning(self.translate('c_ext_get_balance_unexcepted_err'))
+
+                log.debug('TRACEBACK', exc_info=True)
+
+
+                log.info(self.translate('c_ext_try_again_in_n_secs', 2))
+
+
+                sleep(2)
+
+                continue
+
+
+        else:
+            log.error(self.translate('c_ext_get_balance_too_many_attempts_err', attempts))
+
+            log.debug('TRACEBACK', exc_info=True)
+
+
+            raise exceptions.GetBalanceError()
+
+
+        self.run_handlers(self.handlers.get('GET_BALANCE_SUCCESS', []), [balance])
+
+
+        return balance
+
+
     def send_message(self, chat_id: int | str, message_text: str, chat_name: str | None = None,
                      interlocutor_id: int | None = None, attempts: int = 3,
                      watermark: bool = True) -> list[Message] | None:
@@ -1002,7 +1239,7 @@ class Cardinal:
 
                         result.append(msg)
 
-                        log.info(self.__translate('c_ext_msg_sent', chat_id))
+                        log.info(self.translate('c_ext_msg_sent', chat_id))
 
                     elif isinstance(entity, int):
                         msg = self.account.send_image(
@@ -1017,24 +1254,24 @@ class Cardinal:
 
                         result.append(msg)
 
-                        log.info(self.__translate('c_ext_msg_sent', chat_id))
+                        log.info(self.translate('c_ext_msg_sent', chat_id))
 
                     elif isinstance(entity, float): sleep(entity)
 
                     break
 
                 except Exception as ex:
-                    log.warning(self.__translate('c_ext_msg_send_err', chat_id))
+                    log.warning(self.translate('c_ext_msg_send_err', chat_id))
                     log.debug('TRACEBACK', exc_info=True)
 
-                    log.info(self.__translate('c_ext_msg_attempts_left', current_attempts))
+                    log.info(self.translate('c_ext_msg_attempts_left', current_attempts))
 
                     current_attempts -= 1
                     sleep(1)
 
 
             else:
-                log.error(self.__translate('c_ext_msg_no_more_attempts_err', chat_id))
+                log.error(self.translate('c_ext_msg_no_more_attempts_err', chat_id))
                 return []
 
 
@@ -1084,7 +1321,7 @@ class Cardinal:
 
                 return result
             except:
-                log.warning(self.__translate('c_ext_getting_exchange_rate_err', i))
+                log.warning(self.translate('c_ext_getting_exchange_rate_err', i))
                 log.debug('TRACEBACK', exc_info=True)
                 sleep(1)
 
@@ -1098,20 +1335,10 @@ class Cardinal:
     def config(self): return Config(self.name)
 
 
-    @property
-    def __cardinal_package_version(self) -> str: # TODO move to Utils
-        'Текущая версия программы.'
-        with open(VERSION_PATH, 'r') as fp:
-            result = fp.read()
-
-
-        return result
-
-
     # ---------------------------------------------------------------------------- #
     #                                    Прочее                                    #
     # ---------------------------------------------------------------------------- #
-    def __translate(self, variable_name: str, *args, **kwargs):
+    def translate(self, variable_name: str, *args, **kwargs):
         'Возвращает форматированный локализированный текст.'
         return Localizer().translate(self.config.language, variable_name, *args, **kwargs)
 
@@ -1121,21 +1348,21 @@ class Cardinal:
         current_time = datetime.now()
 
         if current_time.hour < 4:
-            greetings = self.__translate('c_ext_greetings_night_part')
+            greetings = self.translate('c_ext_greetings_night_part')
         elif current_time.hour < 12:
-            greetings = self.__translate('c_ext_greetings_morning_part')
+            greetings = self.translate('c_ext_greetings_morning_part')
         elif current_time.hour < 17:
-            greetings = self.__translate('c_ext_greetings_day_part')
+            greetings = self.translate('c_ext_greetings_day_part')
         else:
-            greetings = self.__translate('c_ext_greetings_evening_part')
+            greetings = self.translate('c_ext_greetings_evening_part')
 
 
         lines = [
-            self.__translate('c_ext_greetings_part_1', greetings, self.account.username),
-            self.__translate('c_ext_greetings_part_2', self.account.id),
-            self.__translate('c_ext_greetings_part_3', self.balance.total_rub, self.balance.total_usd, self.balance.total_eur),
-            self.__translate('c_ext_greetings_part_4', self.account.active_sales),
-            self.__translate('c_ext_greetings_part_5'),
+            self.translate('c_ext_greetings_part_1', greetings, self.account.username),
+            self.translate('c_ext_greetings_part_2', self.account.id),
+            self.translate('c_ext_greetings_part_3', self.balance.total_rub, self.balance.total_usd, self.balance.total_eur),
+            self.translate('c_ext_greetings_part_4', self.account.active_sales),
+            self.translate('c_ext_greetings_part_5'),
         ]
 
 
@@ -1211,3 +1438,9 @@ class Cardinal:
             if text := msg_text[pos:].strip(): entities.extend(split_text(text))
 
         return entities
+
+
+__all__ = [
+    'get_cardinal',
+    'Cardinal'
+]

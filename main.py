@@ -3,7 +3,7 @@ import sys
 import os
 
 
-from cardinal_manager import CardinalManager
+from cardinal import Cardinal
 
 
 from configs import VERSION_PATH, PLUGINS_DIR, LOGS_DIR, STORAGE_DIR, CACHE_DIR, UPDATE_DIR, Config
@@ -33,10 +33,13 @@ for folder in folders:
     if not folder.exists(): folder.mkdir(parents=True, exist_ok=True)
 
 
-colorama.init()
+Config.init_config()
 
 
 logger_config: dict = Config().LOGGER.to_dict()
+
+colorama.init()
+
 
 logging.config.dictConfig(logger_config)
 
@@ -89,23 +92,26 @@ if sys.platform == 'linux' and os.getenv('FPC_IS_RUNNIG_AS_SERVICE', '0') == '1'
 try:
     log.info('Starting program...')
 
-    manager = CardinalManager()
+    crd = Cardinal('CARDINAL', VERSION)
 
-    manager.start_cardinal('CARDINAL', VERSION)
+    crd.init().start()
 
-    manager.loop()
 
 except KeyboardInterrupt:
     log.info('Exiting program...')
 
     sys.exit()
 
+
 except:
     log.critical('An unhandled error occurred when Cardinal was running.')
+
     log.warning('TRACEBACK', exc_info=True)
 
 
     log.critical('Exiting program...')
 
+
     time.sleep(5)
+
     sys.exit()
