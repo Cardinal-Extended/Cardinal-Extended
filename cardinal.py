@@ -121,9 +121,9 @@ class Cardinal:
         'Курс валют {(валюта1, валюта2): (курс, время обновления)}'
 
 
-        self.update_session_worker: CardinalWorker = None
+        self.session_update_worker: CardinalWorker = None
         'Обработчик обновления сессии.'
-        self.update_session_worker_running: bool = False
+        self.session_update_worker_running: bool = False
         'Флаг запущенного бесконечного цикла обновления сессии.'
 
 
@@ -277,19 +277,21 @@ class Cardinal:
         self.session_update_worker = CardinalWorker(
             self,
             self.update_session,
-            'update_session_worker_running',
+            'session_update_worker_running',
             True,
-            foo_args=(3,)
+            60,
+            (3,)
         )
 
-        self.update_session_worker_running: bool = False
+        self.session_update_worker_running: bool = False
 
 
         self.check_updates_worker = CardinalWorker(
             self,
             self.__check_updates,
             'check_updates_worker_running',
-            True
+            True,
+            60
         )
 
         self.check_updates_worker_running: bool = False
@@ -635,6 +637,10 @@ class Cardinal:
 
 
                 return self.config.check_for_updates_delay
+
+
+            # ----------------------------- Если релизов нет ----------------------------- #
+            return self.config.check_for_updates_delay
 
 
         except SystemExit: exit('Запланированное закрытие программы')
