@@ -318,9 +318,11 @@ __all__ = [
     'ChatsListChangedEvent',
     'LastChatMessageChangedEvent',
     'NewMessageEvent',
-    'MessageEventsStack',
     'InitialOrderEvent',
     'OrdersListChangedEvent',
     'NewOrderEvent',
-    'OrderStatusChangedEvent'
+    'OrderStatusChangedEvent',
+    'RunnerPayload',
+    'RunnerPayloadObject',
+    'RunnerPayloadRequest'
 ]

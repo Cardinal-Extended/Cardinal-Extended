@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from datetime import datetime
 from time import time
+from typing import Literal
+import json
 
 
 def __get_message_type_by_re(text: str) -> MessageTypes:
@@ -193,40 +195,51 @@ class Months(Enum):
     Названия месяцев на FunPay.
     '''
     January = 1
-    February = 2
-    March = 3
-    April = 4
-    May = 5
-    June = 6
-    July = 7
-    August = 8
-    September = 9
-    October = 10
-    November = 11
-    December = 12
     января = 1
-    февраля = 2
-    марта = 3
-    апреля = 4
-    мая = 5
-    июня = 6
-    июля = 7
-    августа = 8
-    сентября = 9
-    октября = 10
-    ноября = 11
-    декабря = 12
     січня = 1
+
+    February = 2
+    февраля = 2
     лютого = 2
+
+    March = 3
+    марта = 3
     березня = 3
+
+    April = 4
+    апреля = 4
     квітня = 4
+
+    May = 5
+    мая = 5
     травня = 5
+
+    June = 6
+    июня = 6
     червня = 6
+
+    July = 7
+    июля = 7
     липня = 7
+
+    August = 8
+    августа = 8
     серпня = 8
+
+    September = 9
+    сентября = 9
     вересня = 9
+
+    October = 10
+    октября = 10
     жовтня = 10
+
+    November = 11
+    ноября = 11
     листопада = 11
+
+    December = 12
+    декабря = 12
     грудня = 12
 
 
@@ -238,7 +251,18 @@ class Months(Enum):
 @dataclass(unsafe_hash=True)
 class BuyerViewing:
     '''
-    Данный класс представляет поле 'Покупатель смотрит'
+    Класс, описывающий поле 'Покупатель смотрит'
+
+    :param buyer_id: Айди покупателя.
+    :type buyer_id: int
+    :param link: Ссылка на лот, defaults to None.
+    :type link: str | None, optional
+    :param text: Текстовое описание лота, defaults to None.
+    :type text: str | None, optional
+    :param tag: Тег события, defaults to None.
+    :type tag: str | None, optional
+    :param html: HTML-код блока просмотра, defaults to None.
+    :type html: str | None, optional
     '''
     buyer_id: int
     'Айди покупателя.'
@@ -254,6 +278,26 @@ class BuyerViewing:
 
 @dataclass(unsafe_hash=True)
 class ChatShortcut:
+    '''
+    Класс, описывающий виджет чата со страницы https://funpay.com/chat/
+
+    :param id: Айди чата.
+    :type id: int
+    :param name: Название чата (имя собеседника).
+    :type name: str
+    :param last_message_text: Текст последнего сообщения в чате (макс. 250 символов).
+    :type last_message_text: str
+    :param node_msg_id: Айди последнего сообщения в чате.
+    :type node_msg_id: int
+    :param user_msg_id: Айди последнего прочитанного сообщения.
+    :type user_msg_id: int
+    :param unread: Флаг непрочитанного чата.
+    :type unread: bool
+    :param html: HTML-код виджета чата.
+    :type html: str
+    :param last_by_bot: Отправлено ли последнее сообщение с помощью Account.send_message, defaults to None.
+    :type last_by_bot: bool | None, optional
+    '''
     id: int
     'Айди чата.'
     name: str
@@ -276,7 +320,7 @@ class ChatShortcut:
     @property
     def last_message_type(self) -> MessageTypes:
         '''
-        Тип последнего сообщения в чате на основе регулярных выражений
+        Тип последнего сообщения в чате на основе регулярных выражений.
         '''
         if self.__last_message_type is None: self.__last_message_type = __get_message_type_by_re(self.last_message_text)
 
@@ -286,6 +330,22 @@ class ChatShortcut:
 
 @dataclass
 class Chat:
+    '''
+    Класс, описывающий личный чат.
+
+    :param id: Айди чата.
+    :type id: int
+    :param name: Название чата (имя собеседника).
+    :type name: str
+    :param html: HTML-код чата.
+    :type html: str
+    :param messages: Последние 100 сообщений чата, defaults to [].
+    :type messages: list[Message], optional
+    :param looking_link: Ссылка на лот, который смотрит собеседник, defaults to None.
+    :type looking_link: str | None, optional
+    :param looking_text: Название лота, который смотрит собеседник, defaults to None.
+    :type looking_text: str | None, optional
+    '''
     id: int
     'Айди чата.'
     name: str
@@ -305,6 +365,54 @@ class Chat:
 
 @dataclass(unsafe_hash=True)
 class Message:
+    '''
+    Класс, описывающий отдельное сообщение.
+
+    :param id: Айди сообщения.
+    :type id: int
+    :param text: Текст сообщения.
+    :type text: str
+    :param chat_id: Айди чата.
+    :type chat_id: int | str
+    :param chat_name: Название чата.
+    :type chat_name: str | None
+    :param interlocutor_id: Айди собеседника.
+    :type interlocutor_id: int | None
+    :param author: Автор сообщения.
+    :type author: str | None
+    :param author_id: Айди автора сообщения.
+    :type author_id: int
+    :param html: HTML-код сообщения.
+    :type html: str
+    :param buyer_viewing: Лот, который смотрит собеседник, defaults to None.
+    :type buyer_viewing: BuyerViewing | None, optional
+    :param by_bot: Отправлено ли сообщение с помощью Account.send_message, defaults to False.
+    :type by_bot: bool, optional
+    :param image_link: Ссылка на изображение в сообщении, defaults to None.
+    :type image_link: str | None, optional
+    :param image_name: Название изображения, defaults to None.
+    :type image_name: str | None, optional
+    :param badge: Текст бэйджика техподдержки или автовыдачи FunPay, defaults to None.
+    :type badge: str | None, optional
+    :param is_employee: Является ли пользователь сотрудником, defaults to False.
+    :type is_employee: bool, optional
+    :param is_support: Наличие бэйджика поддержки, defaults to False.
+    :type is_support: bool, optional
+    :param is_moderation: Наличие бэйджика модерации, defaults to False.
+    :type is_moderation: bool, optional
+    :param is_arbitration: Наличие бэйджика арбитража, defaults to False.
+    :type is_arbitration: bool, optional
+    :param is_autoreply: Наличие бэйджика автоответа, defaults to False.
+    :type is_autoreply: bool, optional
+    :param initiator_username: Ник пользователя, который выполнил действие (для системных сообщений), defaults to None.
+    :type initiator_username: str | None, optional
+    :param initiator_id: Айди пользователя, который выполнил действие (для системных сообщений), defaults to None.
+    :type initiator_id: int | None, optional
+    :param i_am_seller: Являемся ли мы продавцом по заказу (для системных сообщений), defaults to None.
+    :type i_am_seller: bool | None, optional
+    :param i_am_buyer: Являемся ли мы покупателем по заказу (для системных сообщений), defaults to None.
+    :type i_am_buyer: bool | None, optional
+    '''
     id: int
     'Айди сообщения.'
     text: str
@@ -322,9 +430,9 @@ class Message:
     html: str
     'HTML-код сообщения.'
     buyer_viewing: BuyerViewing | None = None
-    'Лот, который смотрит собеседник'
+    'Лот, который смотрит собеседник.'
     by_bot: bool = False
-    'Отправлено ли сообщение с помощью Account.send_message?'
+    'Отправлено ли сообщение с помощью Account.send_message.'
     image_link: str | None = None
     'Ссылка на изображение в сообщении.'
     image_name: str | None = None
@@ -332,7 +440,7 @@ class Message:
     badge: str | None = None
     'Текст бэйджика техподдержки или автовыдачи FunPay.'
     is_employee: bool = False
-    'Является ли пользователь сотрудником?'
+    'Является ли пользователь сотрудником.'
     is_support: bool = False
     'Наличие бэйджика поддержки.'
     is_moderation: bool = False
@@ -346,9 +454,9 @@ class Message:
     initiator_id: int | None = None
     'Айди пользователя, который выполнил действие (для системных сообщений).'
     i_am_seller: bool | None = None
-    'Являемся ли мы продавцом по заказу (для системных сообщений)?'
+    'Являемся ли мы продавцом по заказу (для системных сообщений).'
     i_am_buyer: bool | None = None
-    'Являемся ли мы покупателем по заказу (для системных сообщений)?'
+    'Являемся ли мы покупателем по заказу (для системных сообщений).'
     __type: MessageTypes | None = field(init=False, default=None)
 
 
@@ -368,6 +476,34 @@ class Message:
 
 @dataclass(unsafe_hash=True)
 class OrderShortcut:
+    '''
+    Класс, описывающий виджет заказа со страницы https://funpay.com/orders/trade
+
+    :param id: Айди заказа.
+    :type id: str
+    :param description: Описание заказа.
+    :type description: str
+    :param price: Цена заказа.
+    :type price: float
+    :param currency: Валюта заказа.
+    :type currency: Currencies
+    :param buyer_username: Никнейм покупателя.
+    :type buyer_username: str
+    :param buyer_id: Айди покупателя.
+    :type buyer_id: int
+    :param chat_id: Айди чата.
+    :type chat_id: int | str
+    :param status: Статус заказа.
+    :type status: OrderStatuses
+    :param date: Дата создания заказа.
+    :type date: datetime
+    :param subcategory_name: Название подкатегории, к которой относится заказ.
+    :type subcategory_name: str
+    :param subcategory: Подкатегория, к которой относится заказ.
+    :type subcategory: SubCategory | None
+    :param html: HTML-код виджета заказа.
+    :type html: str
+    '''
     id: str
     'Айди заказа.'
     description: str
@@ -403,7 +539,7 @@ class OrderShortcut:
         if self.__amount is None:
             result = [m.groupdict() for m in PRODUCTS_AMOUNT_RE.finditer(self.description)]
 
-            self.__amount = int(result[0]['amount'].replace(" ", "")) if result else 1
+            self.__amount = int(result[0]['amount'].replace(' ', '')) if result else 1
 
 
         return self.__amount
@@ -411,6 +547,48 @@ class OrderShortcut:
 
 @dataclass
 class Order:
+    '''
+    Класс, описывающий заказ со страницы https://funpay.com/orders/<ORDER_ID>/
+
+    :param id: Айди заказа.
+    :type id: str
+    :param status: Статус заказа.
+    :type status: OrderStatuses
+    :param subcategory: Подкатегория заказа.
+    :type subcategory: SubCategory | None
+    :param lot_params: Параметры лота (значения некоторых полей заказа).
+    :type lot_params: list[tuple[str, str]]
+    :param buyer_params: Параметры заказа, указанные покупателем.
+    :type buyer_params: dict[str, str]
+    :param title: Краткое описание (название) заказа. То же самое, что и title.
+    :type title: str | None
+    :param short_description: Краткое описание (название) заказа. То же самое, что и short_description.
+    :type short_description: str | None
+    :param full_description: Полное описание заказа.
+    :type full_description: str | None
+    :param amount: Количество.
+    :type amount: int
+    :param sum: Сумма заказа.
+    :type sum: float
+    :param currency: Валюта заказа.
+    :type currency: Currencies
+    :param buyer_id: Айди покупателя.
+    :type buyer_id: int
+    :param buyer_username: Никнейм покупателя.
+    :type buyer_username: str
+    :param seller_id: Айди продавца.
+    :type seller_id: int
+    :param seller_username: Никнейм продавца.
+    :type seller_username: str
+    :param chat_id: Айди чата.
+    :type chat_id: str | int
+    :param html: HTML-код заказа.
+    :type html: str
+    :param review: Объект отзыва заказа.
+    :type review: Review | None
+    :param order_secrets: Список товаров автовыдачи FunPay заказа.
+    :type order_secrets: list[str]
+    '''
     id: str
     'Айди заказа.'
     status: OrderStatuses
@@ -496,6 +674,18 @@ class Order:
 
 @dataclass
 class Category:
+    '''
+    Класс, описывающий категорию (игру).
+
+    :param id: Айди категории (game_id/data-id).
+    :type id: int
+    :param name: Название категории (игры).
+    :type name: str
+    :param subcategories: Список подкатегорий, defaults to [].
+    :type subcategories: list[SubCategory], optional
+    :param position: Порядковый номер игры в списке игр (по алфавиту), defaults to 100_000.
+    :type position: int, optional
+    '''
     id: int
     'Айди категории (game_id/data-id).'
     name: str
@@ -509,7 +699,7 @@ class Category:
     @property
     def sorted_subcategories(self) -> dict[SubCategoryTypes, dict[int, SubCategory]]:
         '''
-        Все подкатегории данной категории (игры) в виде словаря {type: {ID: подкатегория}}.
+        Все подкатегории данной категории (игры) в виде словаря {Тип: {Айди: Подкатегория}}.
         '''
         sorted_subcategories: dict[SubCategoryTypes, dict[int, SubCategory]] = {
             SubCategoryTypes.COMMON: {},
@@ -551,6 +741,20 @@ class Category:
 
 @dataclass(unsafe_hash=True)
 class SubCategory:
+    '''
+    Класс, описывающий подкатегорию.
+
+    :param id: Айди подкатегории.
+    :type id: int
+    :param name: Название подкатегории.
+    :type name: str
+    :param type: Тип подкатегории.
+    :type type: SubCategoryTypes
+    :param category: Родительская категория (игра).
+    :type category: Category
+    :param position: Порядковый номер подкатегории в общем списке игр (для сортировки), defaults to 100_000.
+    :type position: int, optional
+    '''
     id: int
     'Айди подкатегории.'
     name: str
@@ -594,7 +798,7 @@ class __Fields:
     @property
     def csrf_token(self) -> str | None:
         'CSRF-токен.'
-        return self.fields.get("csrf_token")
+        return self.fields.get('csrf_token')
 
     @csrf_token.setter
     def csrf_token(self, csrf_token: str | None): self.fields['csrf_token'] = csrf_token if csrf_token is not None else ''
@@ -602,6 +806,20 @@ class __Fields:
 
 @dataclass
 class LotFields(__Fields):
+    '''
+    Класс, описывающий поля лота со страницы редактирования лота.
+
+    :param fields: Поля лота.
+    :type fields: dict[str, str]
+    :param lot_id: Айди лота.
+    :type lot_id: int
+    :param subcategory: Подкатегория лота, defaults to None.
+    :type subcategory: SubCategory | None, optional
+    :param currency: Валюта лота, defaults to Currencies.UNKNOWN.
+    :type currency: Currencies, optional
+    :param calc_result: Ответ на запрос о рассчете комиссии раздела, defaults to None.
+    :type calc_result: CalcResult | None, optional
+    '''
     lot_id: int
     'Айди лота.'
     subcategory: SubCategory | None = None
@@ -683,7 +901,7 @@ class LotFields(__Fields):
         '''
         Айди изображений лота.
         '''
-        return [int(image) for image in self.fields.get("fields[images]", "").split(",") if image]
+        return [int(image) for image in self.fields.get('fields[images]', '').split(',') if image]
 
     @images.setter
     def images(self, images: list[int]): self.fields['fields[images]'] = ','.join([str(image) for image in images])
@@ -694,7 +912,7 @@ class LotFields(__Fields):
         '''
         Включена ли автовыдача FunPay.
         '''
-        return self.fields.get("auto_delivery") == "on"
+        return self.fields.get('auto_delivery') == 'on'
 
     @auto_delivery.setter
     def auto_delivery(self, auto_delivery: bool): self.fields['auto_delivery'] = 'on' if auto_delivery else ''
@@ -705,10 +923,10 @@ class LotFields(__Fields):
         '''
         Товары автовыдачи FunPay.
         '''
-        return [secret for secret in self.fields.get("secrets", "").strip().split("\n") if secret]
+        return [secret for secret in self.fields.get('secrets', '').strip().split('\n') if secret]
 
     @secrets.setter
-    def secrets(self, secrets: list[str]): self.fields['secrets'] = "\n".join(secrets)
+    def secrets(self, secrets: list[str]): self.fields['secrets'] = '\n'.join(secrets)
 
 
     @property
@@ -716,7 +934,7 @@ class LotFields(__Fields):
         '''
         Кол-во товара.
         '''
-        return int(self.fields.get("amount")) if self.fields.get("amount") else None
+        return int(self.fields.get('amount')) if self.fields.get('amount') else None
 
     @amount.setter
     def amount(self, amount: int | None): self.fields['amount'] = str(amount) if amount is not None else ''
@@ -727,7 +945,7 @@ class LotFields(__Fields):
         '''
         Цена за 1 шт.
         '''
-        return float(price) if (price := self.fields.get("price")) else None
+        return float(price) if (price := self.fields.get('price')) else None
 
     @price.setter
     def price(self, price: float | None): self.fields['price'] = str(price) if price is not None else ''
@@ -738,7 +956,7 @@ class LotFields(__Fields):
         '''
         Активен ли лот.
         '''
-        return self.fields.get("active") == "on"
+        return self.fields.get('active') == 'on'
 
     @active.setter
     def active(self, active: bool): self.fields['active'] = 'on' if active else ''
@@ -749,7 +967,7 @@ class LotFields(__Fields):
         '''
         Деактивировать ли лот после продажи.
         '''
-        return self.fields.get("deactivate_after_sale") == "on"
+        return self.fields.get('deactivate_after_sale') == 'on'
 
     @deactivate_after_sale.setter
     def deactivate_after_sale(self, deactivate_after_sale: bool): self.fields['deactivate_after_sale'] = 'on' if deactivate_after_sale else ''
@@ -776,22 +994,54 @@ class LotFields(__Fields):
 
 @dataclass(unsafe_hash=True)
 class ChipOffer:
+    '''
+    Класс, описывающий секцию полей лота валюты (предложение).
+
+    :param lot_id: Айди лота.
+    :type lot_id: str
+    :param active: Активен ли лот, defaults to False.
+    :type active: bool, optional
+    :param server: Сервер (игра), defaults to None.
+    :type server: str | None, optional
+    :param side: , defaults to None.
+    :type side: str | None, optional
+    :param price: Цена, defaults to None.
+    :type price: float | None, optional
+    :param amount: Кол-во доступной валюты, defaults to None.
+    :type amount: int | None, optional
+    '''
     lot_id: str
+    'Айди лота.'
     active: bool = False
+    'Активен ли лот.'
     server: str | None = None
+    'Сервер (игра).'
     side: str | None = None
+    '' # TODO
     price: float | None = None
+    'Цена.'
     amount: int | None = None
+    'Кол-во доступной валюты.'
 
 
     @property
     def key(self):
-        s = "".join([f"[{key}]" for key in self.lot_id.split("-")[3:]])
-        return f"offers{s}"
+        s = ''.join([f'[{key}]' for key in self.lot_id.split('-')[3:]])
+        return f'offers{s}'
 
 
 @dataclass
 class ChipFields(__Fields):
+    '''
+    Класс, описывающий поля лота со страницы редактирования лота валюты.
+
+    :param fields: Поля лота.
+    :type fields: dict[str, str]
+    :param account_id: Айди аккаунта FunPay.
+    :type account_id: int
+    :param subcategory_id: Айди подкатегории лота.
+    :type subcategory_id: int
+    '''
     account_id: int
     'Айди аккаунта FunPay.'
     subcategory_id: int
@@ -801,6 +1051,7 @@ class ChipFields(__Fields):
 
     @property
     def min_sum(self) -> float | None:
+        'Минимальное кол-во для покупки.'
         return float(self.fields.get('options[chip_min_sum]')) if self.fields.get('options[chip_min_sum]') else None
 
     @min_sum.setter
@@ -810,7 +1061,7 @@ class ChipFields(__Fields):
     @property
     def game_id(self) -> int:
         'Айди игры'
-        return int(self.fields.get("game"))
+        return int(self.fields.get('game'))
 
     @game_id.setter
     def game_id(self, game_id: int): self.fields['game'] = str(game_id)
@@ -818,6 +1069,7 @@ class ChipFields(__Fields):
 
     @property
     def chip_offers(self) -> dict[str, ChipOffer]:
+        'Секции (предложения) валюты.'
         if not self.__chip_offers:
             self.__chip_offers: dict[str, ChipOffer] = {}
 
@@ -826,20 +1078,20 @@ class ChipFields(__Fields):
 
 
                 nums = re.findall(r'\d+', k)
-                key = "-".join(list(map(str, nums)))
+                key = '-'.join(list(map(str, nums)))
 
-                offer_id = f"{self.account_id}-{self.game_id}-{self.subcategory_id}-{key}"
+                offer_id = f'{self.account_id}-{self.game_id}-{self.subcategory_id}-{key}'
 
                 if offer_id not in self.__chip_offers: self.__chip_offers[offer_id] = ChipOffer(offer_id)
 
 
-                field = k.split("[")[-1].rstrip("]")
+                field = k.split('[')[-1].rstrip(']')
 
                 v = self.fields[k]
 
-                if field == "active": self.__chip_offers[offer_id].active = v == "on"
-                elif field == "price": self.__chip_offers[offer_id].price = float(v) if v else None
-                elif field == "amount": self.__chip_offers[offer_id].amount = int(v) if v else None
+                if field == 'active': self.__chip_offers[offer_id].active = v == 'on'
+                elif field == 'price': self.__chip_offers[offer_id].price = float(v) if v else None
+                elif field == 'amount': self.__chip_offers[offer_id].amount = int(v) if v else None
 
 
         return self.__chip_offers
@@ -853,13 +1105,13 @@ class ChipFields(__Fields):
         for chip_offer in chip_offers.values():
             key = chip_offer.key
 
-            self.fields[f"{key}[amount]"] = str(chip_offer.amount) if chip_offer.amount is not None else ""
+            self.fields[f'{key}[amount]'] = str(chip_offer.amount) if chip_offer.amount is not None else ''
 
-            self.fields[f"{key}[price]"] = str(chip_offer.price) if chip_offer.price is not None else ""
+            self.fields[f'{key}[price]'] = str(chip_offer.price) if chip_offer.price is not None else ''
 
-            if chip_offer.active: self.fields[f"{key}[active]"] = "on"
+            if chip_offer.active: self.fields[f'{key}[active]'] = 'on'
 
-            else: self.fields.pop(f"{key}[active]", None)
+            else: self.fields.pop(f'{key}[active]', None)
 
 
     def __hash__(self): return hash((self.account_id, self.subcategory_id))
@@ -867,6 +1119,24 @@ class ChipFields(__Fields):
 
 @dataclass
 class LotPage:
+    '''
+    Класс, описывающий поля лота со страницы лота (https://funpay.com/lots/offer?id=XXXXXXXXXX).
+
+    :param lot_id: Айди лота.
+    :type lot_id: int
+    :param subcategory: Подкатегория.
+    :type subcategory: SubCategory | None
+    :param short_description: Краткое описание.
+    :type short_description: str | None
+    :param full_description: Подробное описание.
+    :type full_description: str | None
+    :param image_urls: Список URL-адресов изображений лота.
+    :type image_urls: list[str]
+    :param seller_id: Айди продавца.
+    :type seller_id: int
+    :param seller_username: Имя продавца.
+    :type seller_username: str
+    '''
     lot_id: int
     'Айди лота.'
     subcategory: SubCategory | None
@@ -880,15 +1150,15 @@ class LotPage:
     seller_id: int
     'Айди продавца.'
     seller_username: str
-    'Юзернейм продавца.'
+    'Имя продавца.'
 
 
     @property
     def seller_url(self) -> str:
-        """
+        '''
         Cсылка на продавца.
-        """
-        return f"https://funpay.com/users/{self.seller_id}/"
+        '''
+        return f'https://funpay.com/users/{self.seller_id}/'
 
 
     def __hash__(self): return hash((self.lot_id, self.subcategory, self.short_description, self.full_description, self.seller_id, self.seller_username))
@@ -896,18 +1166,34 @@ class LotPage:
 
 @dataclass(unsafe_hash=True)
 class SellerShortcut:
+    '''
+    Класс, описывающий объект пользователя из таблицы предложений.
+
+    :param id: Айди пользователя.
+    :type id: int
+    :param username: Никнейм пользователя.
+    :type username: str
+    :param online: Онлайн ли пользователь.
+    :type online: bool
+    :param stars: Количество звезд.
+    :type stars: int | None
+    :param reviews: Количество отзывов.
+    :type reviews: int
+    :param html: HTML-код страницы пользователя.
+    :type html: str
+    '''
     id: int
-    "ID пользователя."
+    'Айди пользователя.'
     username: str
-    "Никнейм пользователя."
+    'Никнейм пользователя.'
     online: bool
-    "Онлайн ли пользователь."
+    'Онлайн ли пользователь.'
     stars: int | None
-    "Количество звезд."
+    'Количество звезд.'
     reviews: int
-    "Количество отзывов."
+    'Количество отзывов.'
     html: str
-    "HTML-код страницы пользователя."
+    'HTML-код страницы пользователя.'
 
 
     @property
@@ -915,39 +1201,71 @@ class SellerShortcut:
         '''
         Cсылка на продавца.
         '''
-        return f"https://funpay.com/users/{self.id}/"
+        return f'https://funpay.com/users/{self.id}/'
 
 
 @dataclass
 class LotShortcut:
+    '''
+    Класс, описывающий виджет лота.
+
+    :param id: Айди лота.
+    :type id: int | str
+    :param server: Название сервера (если указан).
+    :type server: str | None
+    :param side: Сторона (если указана).
+    :type side: str | None
+    :param title: Краткое описание (название) лота.
+    :type title: str | None
+    :param description: Краткое описание (название) лота.
+    :type description: str | None
+    :param amount: Количество
+    :type amount: int | None
+    :param price: Цена лота.
+    :type price: float
+    :param currency: Валюта лота.
+    :type currency: Currencies
+    :param subcategory: Подкатегория лота.
+    :type subcategory: SubCategory | None
+    :param seller: Объект продавца (только для лотов из талицы).
+    :type seller: SellerShortcut | None
+    :param auto: Включена ли автовыдача FunPay у лота?
+    :type auto: bool
+    :param promo: В закрепе ли лот? (только для лотов из таблицы)
+    :type promo: bool | None
+    :param attributes: Атрибуты лота (только для лотов из таблицы)
+    :type attributes: dict[str, int | str] | None
+    :param html: HTML-код виджета лота.
+    :type html: str
+    '''
     id: int | str
-    'ID лота.'
+    'Айди лота.'
     server: str | None
-    "Название сервера (если указан)."
+    'Название сервера (если указан).'
     side: str | None
-    "Сторона (если указана)."
+    'Сторона (если указана).'
     title: str | None
-    "Краткое описание (название) лота."
+    'Краткое описание (название) лота.'
     description: str | None
-    "Краткое описание (название) лота."
+    'Краткое описание (название) лота.'
     amount: int | None
-    "Количество"
+    'Количество'
     price: float
-    "Цена лота."
+    'Цена лота.'
     currency: Currencies
-    "Валюта лота."
+    'Валюта лота.'
     subcategory: SubCategory | None
-    "Подкатегория лота."
+    'Подкатегория лота.'
     seller: SellerShortcut | None
-    "Объект продавца (только для лотов из талицы)."
+    'Объект продавца (только для лотов из талицы).'
     auto: bool
-    "Включена ли автовыдача FunPay у лота?"
+    'Включена ли автовыдача FunPay у лота?'
     promo: bool | None
-    "В закрепе ли лот? (только для лотов из таблицы)"
+    'В закрепе ли лот? (только для лотов из таблицы)'
     attributes: dict[str, int | str] | None
-    "Атрибуты лота (только для лотов из таблицы)"
+    'Атрибуты лота (только для лотов из таблицы)'
     html: str
-    "HTML-код виджета лота."
+    'HTML-код виджета лота.'
 
 
     @property
@@ -955,7 +1273,7 @@ class LotShortcut:
         '''
         Публичная ссылка на лот.
         '''
-        return f"https://funpay.com/{'chips' if self.subcategory.type is SubCategoryTypes.CURRENCY else 'lots'}/offer?id={self.id}"
+        return f'https://funpay.com/{'chips' if self.subcategory.type is SubCategoryTypes.CURRENCY else 'lots'}/offer?id={self.id}'
 
 
     def __hash__(self): return hash(
@@ -979,30 +1297,58 @@ class LotShortcut:
 
 @dataclass(unsafe_hash=True)
 class MyLotShortcut:
+    '''
+    Класс, описывающий виджет лота со страницы https://funpay.com/lots/000/trade.
+
+    :param id: Айди лота.
+    :type id: int | str
+    :param server: Название сервера (если указан).
+    :type server: str | None
+    :param side: Сторона (если указана).
+    :type side: str | None
+    :param title: Краткое описание (название) лота.
+    :type title: str | None
+    :param description: Краткое описание (название) лота.
+    :type description: str | None
+    :param amount: Количество
+    :type amount: int | None
+    :param price: Цена лота.
+    :type price: float
+    :param currency: Валюта лота.
+    :type currency: Currencies
+    :param subcategory: Подкатегория лота.
+    :type subcategory: SubCategory | None
+    :param auto: Включена ли автовыдача FunPay у лота.
+    :type auto: bool
+    :param active: Активен ли лот?
+    :type active: bool
+    :param html: HTML-код виджета лота.
+    :type html: str
+    '''
     id: int | str
-    "ID лота."
+    'Айди лота.'
     server: str | None
-    "Название сервера (если указан)."
+    'Название сервера (если указан).'
     side: str | None
-    "Сторона (если указана)."
+    'Сторона (если указана).'
     title: str | None
-    "Краткое описание (название) лота."
+    'Краткое описание (название) лота.'
     description: str | None
-    "Краткое описание (название) лота."
+    'Краткое описание (название) лота.'
     amount: int | None
-    "Количество"
+    'Количество'
     price: float
-    "Цена лота."
+    'Цена лота.'
     currency: Currencies
-    "Валюта лота."
+    'Валюта лота.'
     subcategory: SubCategory | None
-    "Подкатегория лота."
+    'Подкатегория лота.'
     auto: bool
-    "Включена ли автовыдача FunPay у лота?"
+    'Включена ли автовыдача FunPay у лота.'
     active: bool
-    "Активен ли лот?"
+    'Активен ли лот?'
     html: str
-    "HTML-код виджета лота."
+    'HTML-код виджета лота.'
 
 
     @property
@@ -1010,23 +1356,39 @@ class MyLotShortcut:
         '''
         Публичная ссылка на лот.
         '''
-        return f"https://funpay.com/{'chips' if self.subcategory.type is SubCategoryTypes.CURRENCY else 'lots'}/offer?id={self.id}"
+        return f'https://funpay.com/{'chips' if self.subcategory.type is SubCategoryTypes.CURRENCY else 'lots'}/offer?id={self.id}'
 
 
 @dataclass(unsafe_hash=True)
 class UserProfile:
+    '''
+    Класс, описывающий пользователя FunPay.
+
+    :param id: Айди пользователя.
+    :type id: int
+    :param username: Никнейм пользователя.
+    :type username: str
+    :param profile_photo: Ссылка на фото профиля.
+    :type profile_photo: str
+    :param online: Онлайн ли пользователь.
+    :type online: bool
+    :param banned: Заблокирован ли пользователь.
+    :type banned: bool
+    :param html: HTML код страницы пользователя.
+    :type html: str
+    '''
     id: int
-    "ID пользователя."
+    'Айди пользователя.'
     username: str
-    "Никнейм пользователя."
+    'Никнейм пользователя.'
     profile_photo: str
-    "Ссылка на фото профиля."
+    'Ссылка на фото профиля.'
     online: bool
-    "Онлайн ли пользователь."
+    'Онлайн ли пользователь.'
     banned: bool
-    "Заблокирован ли пользователь."
+    'Заблокирован ли пользователь.'
     html: str
-    "HTML код страницы пользователя."
+    'HTML код страницы пользователя.'
     __lots: dict[int | str, LotShortcut] = field(init=False, default_factory=dict)
     __sorted_by_subcategory_lots: dict[SubCategory, dict[int | str, LotShortcut]] = field(init=False, default_factory=dict)
     __sorted_by_subcategory_type_lots: dict[SubCategoryTypes, dict[int | str, LotShortcut]] = field(init=False, default_factory=dict)
@@ -1034,16 +1396,16 @@ class UserProfile:
 
     @property
     def lots(self) -> list[LotShortcut]:
-        """
+        '''
         Список всех лотов пользователя.
-        """
+        '''
         return list(self.__lots.values())
 
 
     @property
     def lots_dict(self) -> dict[int | str, LotShortcut]:
         '''
-        Все лоты пользователя в виде словаря {ID: лот}}.
+        Все лоты пользователя в виде словаря {Айди: лот}}.
         '''
         return self.__lots
 
@@ -1051,7 +1413,7 @@ class UserProfile:
     @property
     def sorted_by_subcategory_lots(self) -> dict[SubCategory, dict[int | str, LotShortcut]]:
         '''
-        Все лоты пользователя в виде словаря {подкатегория: {ID: лот}}.
+        Все лоты пользователя в виде словаря {подкатегория: {Айди: лот}}.
         '''
         return self.__sorted_by_subcategory_lots
 
@@ -1059,7 +1421,7 @@ class UserProfile:
     @property
     def sorted_by_subcategory_type_lots(self) -> dict[SubCategoryTypes, dict[int | str, LotShortcut]]:
         '''
-        Все лоты пользователя в виде словаря {Тип подкатегории: {ID: лот}}.
+        Все лоты пользователя в виде словаря {Тип подкатегории: {Айди: лот}}.
         '''
         if not self.__sorted_by_subcategory_type_lots: self.__sorted_by_subcategory_type_lots = {
             SubCategoryTypes.COMMON: {},
@@ -1071,15 +1433,15 @@ class UserProfile:
 
 
     def get_lot(self, lot_id: int | str) -> LotShortcut | None:
-        """
+        '''
         Возвращает объект лота со страницы пользователя.
 
-        :param lot_id: ID лота.
+        :param lot_id: Айди лота.
         :type lot_id: int | str
 
         :return: Объект лота со страницы пользователя.
         :rtype: LotShortcut | None
-        """
+        '''
         if isinstance(lot_id, str) and lot_id.isnumeric(): return self.__lots.get(int(lot_id))
 
 
@@ -1139,74 +1501,146 @@ class UserProfile:
 
 @dataclass(unsafe_hash=True)
 class Review:
+    '''
+    Класс, описывающий отзыв на заказ.
+
+    :param stars: Кол-во звезде в отзыве.
+    :type stars: int | None
+    :param text: Текст отзыва.
+    :type text: str | None
+    :param reply: Текст ответа на отзыв.
+    :type reply: str | None
+    :param anonymous: Анонимный ли отзыв.
+    :type anonymous: bool
+    :param html: HTML код отзыва.
+    :type html: str
+    :param hidden: Скрыт ли отзыв.
+    :type hidden: bool
+    :param order_id: Айди заказа, к которому относится отзыв, defaults to None.
+    :type order_id: str | None, optional
+    :param author: Автор отзыва, defaults to None.
+    :type author: str | None, optional
+    :param author_id: Айди автора отзыва, defaults to None.
+    :type author_id: int | None, optional
+    :param by_bot: Оставлен ли отзыв ботом, defaults to False.
+    :type by_bot: bool, optional
+    :param reply_by_bot: Оставлен ли ответ на отзыв ботом, defaults to False.
+    :type reply_by_bot: bool, optional
+    '''
     stars: int | None
-    "Кол-во звезде в отзыве."
+    'Кол-во звезде в отзыве.'
     text: str | None
-    "Текст отзыва."
+    'Текст отзыва.'
     reply: str | None
-    "Текст ответа на отзыв."
+    'Текст ответа на отзыв.'
     anonymous: bool
-    "Анонимный ли отзыв?"
+    'Анонимный ли отзыв?'
     html: str
-    "HTML код отзыва."
+    'HTML код отзыва.'
     hidden: bool
-    "Скрыт ли отзыв?"
+    'Скрыт ли отзыв?'
     order_id: str | None = None
-    "ID заказа, к которому относится отзыв."
+    'Айди заказа, к которому относится отзыв.'
     author: str | None = None
-    "Автор отзыва."
+    'Автор отзыва.'
     author_id: int | None = None
-    "ID автора отзыва."
+    'Айди автора отзыва.'
     by_bot: bool = False
-    "Оставлен ли отзыв ботом?"
+    'Оставлен ли отзыв ботом.'
     reply_by_bot: bool = False
-    "Оставлен ли ответ на отзыв ботом?"
+    'Оставлен ли ответ на отзыв ботом.'
 
 
 @dataclass(unsafe_hash=True)
 class Balance:
+    '''
+    Класс, описывающий информацию о балансе аккаунта.
+
+    :param total_rub: Общий рублёвый баланс.
+    :type total_rub: float
+    :param available_rub: Доступный к выводу рублёвый баланс.
+    :type available_rub: float
+    :param total_usd: Общий долларовый баланс.
+    :type total_usd: float
+    :param available_usd: Доступный к выводу долларовый баланс.
+    :type available_usd: float
+    :param total_eur: Общий евро баланс.
+    :type total_eur: float
+    :param available_eur: Доступный к выводу евро баланс.
+    :type available_eur: float
+    '''
     total_rub: float
-    "Общий рублёвый баланс."
+    'Общий рублёвый баланс.'
     available_rub: float
-    "Доступный к выводу рублёвый баланс."
+    'Доступный к выводу рублёвый баланс.'
     total_usd: float
-    "Общий долларовый баланс."
+    'Общий долларовый баланс.'
     available_usd: float
-    "Доступный к выводу долларовый баланс."
+    'Доступный к выводу долларовый баланс.'
     total_eur: float
-    "Общий евро баланс."
+    'Общий евро баланс.'
     available_eur: float
-    "Доступный к выводу евро баланс."
+    'Доступный к выводу евро баланс.'
 
 
 @dataclass(unsafe_hash=True)
 class PaymentMethod:
+    '''
+    Класс, описывающий платежное средство при рассчете цены для покупателя.
+
+    :param name: Название.
+    :type name: str | None
+    :param price: Цена (с комиссией).
+    :type price: float
+    :param currency: Валюта.
+    :type currency: Currencies
+    :param position: Позиция для сортировки.
+    :type position: int | None
+    '''
     name: str | None
-    "Название."
+    'Название.'
     price: float
-    "Цена (с комиссией)."
+    'Цена (с комиссией).'
     currency: Currencies
-    "Валюта."
+    'Валюта.'
     position: int | None
-    "Позиция для сортировки."
+    'Позиция для сортировки.'
 
 
 @dataclass
 class CalcResult:
+    '''
+    Класс, описывающий ответ на запрос о рассчете комиссии раздела.
+
+    :param subcategory_type: Тип подкатегории.
+    :type subcategory_type: SubCategoryTypes
+    :param subcategory_id: Айди подкатегории.
+    :type subcategory_id: int
+    :param methods: Список платежных средств.
+    :type methods: list[PaymentMethod]
+    :param price: Цена без комиссии.
+    :type price: float
+    :param min_price_with_commission: Минимальная цена с комиссией из ответа FunPay, наличие не обязательно.
+    :type min_price_with_commission: float | None
+    :param min_price_currency: Валюта минимальной цены.
+    :type min_price_currency: Currencies
+    :param account_currency: Валюта аккаунта.
+    :type account_currency: Currencies
+    '''
     subcategory_type: SubCategoryTypes
-    "Тип подкатегории."
+    'Тип подкатегории.'
     subcategory_id: int
-    "ID подкатегории."
+    'Айди подкатегории.'
     methods: list[PaymentMethod]
-    "Список платежных средств."
+    'Список платежных средств.'
     price: float
-    "Цена без комиссии."
+    'Цена без комиссии.'
     min_price_with_commission: float | None
-    "Минимальная цена с комиссией из ответа FunPay, наличие не обязательно."
+    'Минимальная цена с комиссией из ответа FunPay, наличие не обязательно.'
     min_price_currency: Currencies
-    "Валюта минимальной цены."
+    'Валюта минимальной цены.'
     account_currency: Currencies
-    "Валюта аккаунта."
+    'Валюта аккаунта.'
 
 
     def get_coefficient(self, currency: Currencies) -> float:
@@ -1224,24 +1658,24 @@ class CalcResult:
         else:
             res = min(filter(lambda x: x.currency == currency, self.methods), key=lambda x: x.price, default=None)
 
-            if not res: raise Exception("Невозможно определить коэффициент комиссии.") # TODO Custom Exception
+            if not res: raise Exception('Невозможно определить коэффициент комиссии.') # TODO Custom Exception
 
             return res.price / self.price
 
 
     @property
     def commission_coefficient(self) -> float:
-        """
+        '''
         Отношение цены с комиссией к цене без комиссии в валюте аккаунта.
-        """
+        '''
         return self.get_coefficient(self.account_currency)
 
 
     @property
     def commission_percent(self) -> float:
-        """
+        '''
         Процент комиссии.
-        """
+        '''
         return (self.commission_coefficient - 1) * 100
 
 
@@ -1251,6 +1685,14 @@ class CalcResult:
 # ------------------------------ События FunPay ------------------------------ #
 @dataclass
 class BaseEvent:
+    '''
+    Базовый класс события.
+
+    :param runner_tag: Тег Runner'а.
+    :type runner_tag: str
+    :param type: Тип события.
+    :type type: EventTypes
+    '''
     runner_tag: str
     '''Тег Runner'а.'''
     type: EventTypes
@@ -1261,88 +1703,163 @@ class BaseEvent:
 
 @dataclass(unsafe_hash=True)
 class InitialChatEvent(BaseEvent):
+    '''
+    Класс события: обнаружен чат при первом запросе Runner'а.
+
+    :param runner_tag: Тег Runner'а.
+    :type runner_tag: str
+    :param cha: Объект обнаруженного чата.
+    :type chat: ChatShortcut
+    '''
     type: EventTypes = field(init=False, default=EventTypes.INITIAL_CHAT)
     'Тип события.'
     chat: ChatShortcut
-    "Объект обнаруженного чата."
+    'Объект обнаруженного чата.'
 
 
 @dataclass(unsafe_hash=True)
 class ChatsListChangedEvent(BaseEvent): # TODO: добавить список всех чатов.
+    '''
+    Класс события: список чатов и / или содержимое одного / нескольких чатов изменилось.
+
+    :param runner_tag: Тег Runner'а.
+    :type runner_tag: str
+    '''
     type: EventTypes = field(init=False, default=EventTypes.CHATS_LIST_CHANGED)
     'Тип события.'
 
 
 @dataclass(unsafe_hash=True)
 class LastChatMessageChangedEvent(BaseEvent):
+    '''
+    Класс события: последнее сообщение в чате изменилось.
+
+    :param runner_tag: Тег Runner'а.
+    :type runner_tag: str
+    :param chat: Объект чата, в котором изменилось последнее сообщение.
+    :type chat: ChatShortcut
+    '''
     type: EventTypes = field(init=False, default=EventTypes.LAST_CHAT_MESSAGE_CHANGED)
     'Тип события.'
     chat: ChatShortcut
-    "Объект чата, в котором изменилось последнее сообщение."
+    'Объект чата, в котором изменилось последнее сообщение.'
 
 
 @dataclass
 class NewMessageEvent(BaseEvent):
+    '''
+    Класс события: в истории чата обнаружено новое сообщение.
+
+    :param runner_tag: Тег Runner'а.
+    :type runner_tag: str
+    :param message: Объект нового сообщения.
+    :type message: Message
+    '''
     type: EventTypes = field(init=False, default=EventTypes.NEW_MESSAGE)
     'Тип события.'
     message: Message
-    "Объект нового сообщения."
-    stack: MessageEventsStack
-    "Объект стека событий новых сообщений."
-
-
-@dataclass
-class MessageEventsStack:
-    id: str = field(init=False, default_factory=generate_random_tag)
-    'Айди стека.'
-    stack: list[NewMessageEvent] = field(init=False, default_factory=list)
-
-
-    def add_events(self, messages: list[NewMessageEvent]) -> None:
-        """
-        Добавляет события новых сообщений в стэк.
-
-        :param messages: список событий новых сообщений.
-        :type messages: list[NewMessageEvent]
-        """
-        self.stack.extend(messages)
-
-
-    def __hash__(self): return hash((self.id,))
+    'Объект нового сообщения.'
 
 
 @dataclass(unsafe_hash=True)
 class InitialOrderEvent(BaseEvent):
+    '''
+    Класс события: обнаружен заказ при первом запросе Runner'а.
+
+    :param runner_tag: Тег Runner'а.
+    :type runner_tag: str
+    :param order: Объект обнаруженного заказа.
+    :type order: OrderShortcut
+    '''
     type: EventTypes = field(init=False, default=EventTypes.INITIAL_ORDER)
     'Тип события.'
     order: OrderShortcut
-    "Объект обнаруженного заказа."
+    'Объект обнаруженного заказа.'
 
 
 @dataclass(unsafe_hash=True)
 class OrdersListChangedEvent(BaseEvent):
+    '''
+    Класс события: список заказов и/или статус одного/нескольких заказов изменился.
+
+    :param runner_tag: Тег Runner'а.
+    :type runner_tag: str
+    :param purchases: Кол-во незавершенных покупок.
+    :type purchases: int
+    :param sales: Кол-во незавершенных продаж.
+    :type sales: int
+    '''
     type: EventTypes = field(init=False, default=EventTypes.ORDERS_LIST_CHANGED)
     'Тип события.'
     purchases: int
-    "Кол-во незавершенных покупок."
+    'Кол-во незавершенных покупок.'
     sales: int
-    "Кол-во незавершенных продаж."
+    'Кол-во незавершенных продаж.'
 
 
 @dataclass(unsafe_hash=True)
 class NewOrderEvent(BaseEvent):
+    '''
+    Класс события: в списке заказов обнаружен новый заказ.
+
+    :param runner_tag: Тег Runner'а.
+    :type runner_tag: str
+    :param order: Объект нового заказа.
+    :type order: OrderShortcut
+    '''
     type: EventTypes = field(init=False, default=EventTypes.NEW_ORDER)
     'Тип события.'
     order: OrderShortcut
-    "Объект нового заказа."
+    'Объект нового заказа.'
 
 
 @dataclass(unsafe_hash=True)
 class OrderStatusChangedEvent(BaseEvent):
+    '''
+    Класс события: статус заказа изменился.
+
+    :param runner_tag: Тег Runner'а.
+    :type runner_tag: str
+    :param order: Объект нового заказа.
+    :type order: Объект измененного заказа.
+    '''
     type: EventTypes = field(init=False, default=EventTypes.ORDER_STATUS_CHANGED)
     'Тип события.'
     order: OrderShortcut
-    "Объект измененного заказа."
+    'Объект измененного заказа.'
+
+
+# ------------------------------ Runner Payload ------------------------------ #
+@dataclass
+class RunnerPayload:
+    objects: list[RunnerPayloadObject] = field(default_factory=list)
+    request: RunnerPayloadRequest | False = False
+
+
+    def to_json(self) -> dict[Literal['objects', 'request'], str]:
+        return {
+            'objects': json.dumps([obj.to_dict() for obj in self.objects])
+        }
+
+
+@dataclass
+class RunnerPayloadObject:
+    type: str
+    tag: str
+    data: dict = field(default_factory=dict)
+
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            'type': self.type,
+            'tag': self.tag,
+            'data': self.data
+        }
+
+
+@dataclass
+class RunnerPayloadRequest:
+    ...
 
 
 __all__ = [
@@ -1377,9 +1894,11 @@ __all__ = [
     'ChatsListChangedEvent',
     'LastChatMessageChangedEvent',
     'NewMessageEvent',
-    'MessageEventsStack',
     'InitialOrderEvent',
     'OrdersListChangedEvent',
     'NewOrderEvent',
-    'OrderStatusChangedEvent'
+    'OrderStatusChangedEvent',
+    'RunnerPayload',
+    'RunnerPayloadObject',
+    'RunnerPayloadRequest'
 ]

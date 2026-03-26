@@ -19,6 +19,16 @@ class AccountNotInitiatedError(Exception):
     def __str__(self): return 'Необходимо получить данные об аккаунте с помощью метода Account.get()'
 
 
+class BoundAccountRunnerError(Exception):
+    def __init__(self):
+        '''
+        Исключение, поднимающееся если при инициализации Runner'а к аккаунту уже привязан другой Runner.
+        '''
+
+
+    def __str__(self): return 'К аккаунту уже привязан Runner'
+
+
 class RequestFailedError(Exception):
     def __init__(self, response: Response):
         '''
@@ -264,6 +274,7 @@ class RefundError(RequestFailedError):
 
 __all__ = [
     'AccountNotInitiatedError',
+    'BoundAccountRunnerError',
     'RequestFailedError',
     'UnauthorizedError',
     'WithdrawError',

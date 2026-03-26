@@ -12,7 +12,7 @@ from time import time, sleep
 
 from . import (
     exceptions, OrderStatuses, generate_random_tag, BuyerViewing, ChatShortcut, OrderShortcut, InitialChatEvent, ChatsListChangedEvent, LastChatMessageChangedEvent,
-    NewMessageEvent, MessageEventsStack, InitialOrderEvent, OrdersListChangedEvent, NewOrderEvent, OrderStatusChangedEvent
+    NewMessageEvent, InitialOrderEvent, OrdersListChangedEvent, NewOrderEvent, OrderStatusChangedEvent
 )
 
 
@@ -20,69 +20,78 @@ logger = logging.getLogger("FunPayAPI.runner")
 
 
 class Runner:
-    """
-    Класс для получения новых событий FunPay.
+    def __init__(self, account: Account, disable_message_requests: bool = False, disable_order_requests: bool = False):
+        '''
+        Класс, описывающий метод /runner FunPay.
 
-    :param account: экземпляр аккаунта (должен быть инициализирован с помощью метода :meth:`FunPayAPI.account.Account.get`).
-    :type account: :class:`FunPayAPI.account.Account`
+        Получает и сортирует новые события, хранит полезную нагрузку, списки заказов/чатов/сообщений.
 
-    :param disable_message_requests: отключить ли запросы для получения истории чатов?\n
-        Если `True`, listen не будет возвращать события
-        NewMessageEvent.\n
-        Из событий, связанных с чатами, будут возвращаться только:\n
-        * InitialChatEvent\n
-        * ChatsListChangedEvent\n
-        * LastChatMessageChangedEvent\n
-    :type disable_message_requests: :obj:`bool`, опционально
+        :param account: Экземпляр аккаунта (должен быть инициализирован с помощью метода Account.get).
+        :type account: Account
+        :param disable_message_requests: Отключить ли запросы для получения истории чатов, defaults to False.\n
+            Если True, listen не будет возвращать события
+            NewMessageEvent.\n
+            Из событий, связанных с чатами, будут возвращаться только:\n
+            * InitialChatEvent\n
+            * ChatsListChangedEvent\n
+            * LastChatMessageChangedEvent\n
+        :type disable_message_requests: bool, optional
+        :param disable_order_requests: Отключить ли запросы для получения списка заказов, defaults to False.\n
+            Если True, listen не будет возвращать события
+            InitialOrderEvent, NewOrderEvent,
+            OrderStatusChangedEvent.\n
+            Из событий, связанных с заказами, будет возвращаться только
+            OrdersListChangedEvent.
+        :type disable_order_requests: bool, optional
+        '''
+        if not account.is_initiated: raise exceptions.AccountNotInitiatedError()
 
-    :param disabled_order_requests: отключить ли запросы для получения списка заказов?\n
-        Если `True`, listen не будет возвращать события
-        InitialOrderEvent, NewOrderEvent,
-        OrderStatusChangedEvent.\n
-        Из событий, связанных с заказами, будет возвращаться только
-        OrdersListChangedEvent.
-    :type disabled_order_requests: :obj:`bool`, опционально
-    """
+        if account.runner: exceptions.BoundAccountRunnerError()
 
-    def __init__(self, account: Account, disable_message_requests: bool = False,
-                 disabled_order_requests: bool = False):
-        # todo добавить события и исключение событий о новых покупках (не продажах!)
-        if not account.is_initiated:
-            raise exceptions.AccountNotInitiatedError()
-        if account.runner:
-            raise Exception("К аккаунту уже привязан Runner!")  # todo
-
-        self.make_msg_requests: bool = False if disable_message_requests else True
-        """Делать ли доп. запросы для получения всех новых сообщений изменившихся чатов?"""
-        self.make_order_requests: bool = False if disabled_order_requests else True
-        """Делать ли доп запросы для получения новых / изменившихся заказов?"""
-
-        self.__first_request = True
-        self.__last_msg_event_tag = generate_random_tag()
-        self.__last_order_event_tag = generate_random_tag()
-
-        self.saved_orders: dict[str, OrderShortcut] = {}
-        """Сохраненные состояния заказов ({ID заказа: экземпляр OrderShortcut})."""
-
-        self.runner_last_messages: dict[int, list[int, int, str | None]] = {}
-        """ID последний сообщений {ID чата: [ID последего сообщения чата, ID последнего прочитанного сообщения чата, 
-        текст последнего сообщения или None, если это изображение]}."""
-
-        self.by_bot_ids: dict[int, list[int]] = {}
-        """ID сообщений, отправленных с помощью self.account.send_message ({ID чата: [ID сообщения, ...]})."""
-
-        self.last_messages_ids: dict[int, int] = {}
-        """ID последних сообщений в чатах ({ID чата: ID последнего сообщения})."""
-
-        self.buyers_viewing: dict[int, BuyerViewing] = {}
-        """Что смотрит покупатель? ({ID покупателя: что смотрит}"""
-
-        self.runner_len: int = 10
-        """Количество событий, на которое успешно отвечает funpay.com/runner/"""
 
         self.account: Account = account
-        """Экземпляр аккаунта, к которому привязан Runner."""
+        'Экземпляр аккаунта, к которому привязан Runner.'
         self.account.runner = self
+
+
+        self.message_requests: bool = False if disable_message_requests else True
+        'Делать ли доп. запросы для получения всех новых сообщений изменившихся чатов.'
+        self.order_requests: bool = False if disable_order_requests else True
+        'Делать ли доп. запросы для получения новых / изменившихся заказов.'
+
+
+        self.__first_request = True
+        'Это первый запрос?'
+
+        self.__last_msg_event_tag = generate_random_tag()
+        'Тег последнего события получения истории чатов.'
+        self.__last_order_event_tag = generate_random_tag()
+        'Тег последнего события получения истории заказов.'
+
+        self.runner_len: int = 10
+        'Количество событий, на которое успешно отвечает /runner.'
+
+
+        # -------------------------------- Кеш событий ------------------------------- #
+        self.saved_orders: dict[str, OrderShortcut] = {}
+        'Сохраненные состояния заказов в виде {айди заказа: OrderShortcut}.'
+
+        self.chats_last_messages: dict[int, dict[str, int|str|None]] = {}
+        'Список последних сообщений чатов.'
+
+        self.by_bot_ids: dict[int, list[int]] = {}
+        'Айди сообщений, отправленных с помощью account.send_message в виде {айди чата: [айди сообщений]}.'
+
+        self.last_message_ids: dict[int, int] = {}
+        'Айди последних сообщений в чатах (для событий сообщений при message_requests=True).'
+
+        self.buyers_viewing: dict[int, BuyerViewing] = {}
+        '{айди покупателя: что смотрит}.'
+
+
+    # def send_request(self, payload: dict): # TODO
+    #     payload['csrf_token'] = self.account.csrf_token
+
 
     def get_updates(self) -> dict:
         """
@@ -119,6 +128,7 @@ class Runner:
         logger.debug(f"Получены данные о событиях: {json_response}")
         return json_response
 
+
     def parse_updates(self, updates: dict) -> list[
         InitialChatEvent |
         ChatsListChangedEvent |
@@ -150,6 +160,7 @@ class Runner:
             self.__first_request = False
         return events
 
+
     def parse_chat_updates(self, obj) -> list[InitialChatEvent | ChatsListChangedEvent | LastChatMessageChangedEvent | NewMessageEvent]:
         """
         Парсит события, связанные с чатами.
@@ -178,18 +189,25 @@ class Runner:
             node_msg_id = int(chat.get('data-node-msg'))
             user_msg_id = int(chat.get('data-user-msg'))
             by_bot = False
-            by_vertex = False
             if last_msg_text.startswith(self.account.bot_character):
                 last_msg_text = last_msg_text[1:]
                 by_bot = True
-            # если сообщение отправлено непрочитанным и вкл старый режим, то [0, 0, None] или [0, 0, "text"]
-            prev_node_msg_id, prev_user_msg_id, prev_text = self.runner_last_messages.get(chat_id) or [-1, -1, None]
+            if self.chats_last_messages.get(chat_id):
+                prev_node_msg_id = self.chats_last_messages[chat_id]['node_msg_id']
+                prev_user_msg_id = self.chats_last_messages[chat_id]['user_msg_id']
+                prev_text = self.chats_last_messages[chat_id]['last_msg_text']
+            else: prev_node_msg_id, prev_user_msg_id, prev_text = (-1, -1, None)
+
             last_msg_text_or_none = None if last_msg_text in ("Изображение", "Зображення", "Image") else last_msg_text
             if node_msg_id <= prev_node_msg_id:
                 continue
             elif not prev_node_msg_id and not prev_user_msg_id and prev_text == last_msg_text_or_none:
                 # значит сообщение отправлено ботом и оставлено непрочитанным - просто обновляем инфу
-                self.runner_last_messages[chat_id] = [node_msg_id, user_msg_id, last_msg_text_or_none]
+                self.chats_last_messages[chat_id] = {
+                    'node_msg_id': node_msg_id,
+                    'user_msg_id': user_msg_id,
+                    'last_msg_text': last_msg_text_or_none
+                }
                 continue
             unread = True if "unread" in chat.get("class") else False
 
@@ -197,12 +215,16 @@ class Runner:
             chat_obj = ChatShortcut(chat_id, chat_with, last_msg_text, node_msg_id, user_msg_id, unread, str(chat), by_bot if last_msg_text_or_none is not None else None)
 
             self.account.add_chats([chat_obj])
-            self.runner_last_messages[chat_id] = [node_msg_id, user_msg_id, last_msg_text_or_none]
+            self.chats_last_messages[chat_id] = {
+                'node_msg_id': node_msg_id,
+                'user_msg_id': user_msg_id,
+                'last_msg_text': last_msg_text_or_none
+            }
             if self.__first_request:
                 events.append(InitialChatEvent(self.__last_msg_event_tag, chat_obj))
 
 
-                if self.make_msg_requests: self.last_messages_ids[chat_id] = node_msg_id
+                if self.message_requests: self.last_message_ids[chat_id] = node_msg_id
 
 
                 continue
@@ -213,14 +235,14 @@ class Runner:
         if lcmc_events:
             events.append(ChatsListChangedEvent(self.__last_msg_event_tag))
 
-        if not self.make_msg_requests:
+        if not self.message_requests:
             events.extend(lcmc_events)
             return events
 
         lcmc_events_without_new_mess = []
         lcmc_events_with_new_mess = []
         for lcmc_event in lcmc_events:
-            if lcmc_event.chat.node_msg_id <= self.last_messages_ids.get(lcmc_event.chat.id, -1):
+            if lcmc_event.chat.node_msg_id <= self.last_message_ids.get(lcmc_event.chat.id, -1):
                 lcmc_events_without_new_mess.append(lcmc_event)
             else:
                 lcmc_events_with_new_mess.append(lcmc_event)
@@ -276,8 +298,8 @@ class Runner:
             self.by_bot_ids[cid] = self.by_bot_ids.get(cid) or []
 
             # Удаляем все сообщения, у которых ID меньше сохраненного последнего сообщения
-            if self.last_messages_ids.get(cid):
-                messages = [i for i in messages if i.id > self.last_messages_ids[cid]]
+            if self.last_message_ids.get(cid):
+                messages = [i for i in messages if i.id > self.last_message_ids[cid]]
             if not messages:
                 continue
 
@@ -287,19 +309,16 @@ class Runner:
                     if not i.by_bot and i.id in self.by_bot_ids[cid]:
                         i.by_bot = True
 
-            stack = MessageEventsStack()
-
             # Если нет сохраненного ID последнего сообщения
-            if not self.last_messages_ids.get(cid):
+            if not self.last_message_ids.get(cid):
                 messages = [m for m in messages if
-                            m.id > min(self.last_messages_ids.values(), default=10 ** 20)] or messages[-1:]
+                            m.id > min(self.last_message_ids.values(), default=10 ** 20)] or messages[-1:]
 
-            self.last_messages_ids[cid] = messages[-1].id  # Перезаписываем ID последнего сообщение
-            self.by_bot_ids[cid] = [i for i in self.by_bot_ids[cid] if i > self.last_messages_ids[cid]]  # чистим память
+            self.last_message_ids[cid] = messages[-1].id  # Перезаписываем ID последнего сообщение
+            self.by_bot_ids[cid] = [i for i in self.by_bot_ids[cid] if i > self.last_message_ids[cid]]  # чистим память
 
             for msg in messages:
-                event = NewMessageEvent(self.__last_msg_event_tag, msg, stack)
-                stack.add_events([event])
+                event = NewMessageEvent(self.__last_msg_event_tag, msg)
                 result[cid].append(event)
         return result
 
@@ -319,7 +338,7 @@ class Runner:
         if not self.__first_request:
             events.append(OrdersListChangedEvent(self.__last_order_event_tag,
                                                  obj["data"]["buyer"], obj["data"]["seller"]))
-        if not self.make_order_requests:
+        if not self.order_requests:
             return events
 
         attempts = 3
@@ -354,7 +373,7 @@ class Runner:
         self.saved_orders = saved_orders
         return events
 
-    def update_last_message(self, chat_id: int, message_id: int, message_text: str | None):
+    def update_chat_last_message(self, chat_id: int, message_id: int, message_text: str | None):
         """
         Обновляет сохраненный ID последнего сообщения чата.
 
@@ -367,7 +386,11 @@ class Runner:
         :param message_text: текст сообщения или None, если это изображение.
         :type message_text: :obj:`str` or :obj:`None`
         """
-        self.runner_last_messages[chat_id] = [message_id, message_id, message_text]
+        self.chats_last_messages[chat_id] = {
+            'node_msg_id': message_id,
+            'user_msg_id': message_id,
+            'last_msg_text': message_text
+        }
 
     def mark_as_by_bot(self, chat_id: int, message_id: int):
         """
@@ -410,25 +433,28 @@ class Runner:
 
         while True:
             start_time = time()
+
             try:
                 updates = self.get_updates()
                 events = self.parse_updates(updates)
-                for event in events:
-                    yield event
+                for event in events: yield event
+
             except Exception as e:
-                if not ignore_exceptions:
-                    raise e
+                if not ignore_exceptions: raise e
+
                 else:
-                    logger.error("Произошла ошибка при получении событий. "
-                                 "(ничего страшного, если это сообщение появляется нечасто).")
+                    logger.error("Произошла ошибка при получении событий. (ничего страшного, если это сообщение появляется нечасто).")
                     logger.debug("TRACEBACK", exc_info=True)
+
+
             iteration_time = time() - start_time
+
             if time() - self.account.last_429_err_time > 60:
-                rt = requests_delay - iteration_time
-                if rt > 0:
-                    sleep(rt)
-            else:
-                sleep(requests_delay)
+                delay = requests_delay - iteration_time
+
+                if delay > 0: sleep(delay)
+
+            else: sleep(requests_delay)
 
 
 __all__ = [

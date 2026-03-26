@@ -856,7 +856,7 @@ class Account:
             if add_to_ignore_list and message_obj.id:
                 self.runner.mark_as_by_bot(chat_id, message_obj.id)
             if update_last_saved_message:
-                self.runner.update_last_message(chat_id, message_obj.id, message_obj.text)
+                self.runner.update_chat_last_message(chat_id, message_obj.id, message_obj.text)
         return message_obj
 
     def send_image(self, chat_id: int, image: int | str | IO[bytes], chat_name: Optional[str] = None,
