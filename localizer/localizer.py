@@ -8,6 +8,7 @@ from .exceptions import *
 
 from typing import Literal, Self
 import json
+from pathlib import Path
 
 
 log = logging.getLogger('Localizer')
@@ -27,12 +28,14 @@ class Localizer:
         if hasattr(self, '__initiated'): return
 
         self.__initiated = True
+        'Флаг инициализации. Всегда True.'
 
 
         self.__load_locales()
 
 
     def __load_locales(self) -> None:
+        'Выгружает переводы из locales.'
         log.debug('Получаю языки.')
 
         locales = 0
@@ -59,6 +62,7 @@ class Localizer:
 
 
     def __get_locale(self, locale: Literal['ru', 'en'] | str) -> dict[str, str]:
+        'Возвращает файл перевода.'
         locale_path = LOCALES_DIR / f'{locale}.json'
 
         if not locale_path.exists(): raise LocaleNotFoundError(locale_path, locale_path.stem)
@@ -119,6 +123,37 @@ class Localizer:
         return text
 
 
+    def translate_from_file(self, from_file: Path, variable_name: str, *args, **kwargs) -> str:
+        '''
+        Выгружает перевод из файла. Возвращает форматированный локализированный текст.
+
+        :param from_file: _description_
+        :type from_file: str | Path
+        :param variable_name: Название переменной с текстом.
+        :type variable_name: str
+        :return: Форматированный локализированный текст.
+        :rtype: str
+        '''
+        with from_file.open('r', encoding='utf-8') as fp: localization_file = json.load(fp)
+
+
+        text: str | None = localization_file.get(variable_name)
+
+        if not text:
+            log.warning(f'Перевод {variable_name} не найден в файле {from_file.stem}.')
+
+            return variable_name
+
+
+        try: return self.format_text(text, *args, **kwargs)
+        except:
+            log.warning(f'Не удалось отформатировать текст "{text}" (args={args}; kwargs={kwargs}).')
+            log.debug('TRACEBACK', exc_info=True)
+
+
+        return text
+
+
     def format_text(self, text: str, *args, **kwargs) -> str:
         _args = list(args)
         args_count = len(ARG_PATTERN.findall(text))
@@ -135,7 +170,7 @@ class Localizer:
 
     def add_translation(self, locale: Literal['ru', 'en'] | str, variable_name: str, value: str, force_add: bool = False) -> None:
         '''
-        Добавляет перевод в локализатор и файл перевода.
+        Добавляет перевод в локализатор и соответствующий файл перевода.
 
         :param locale: Язык.
         :type locale: Literal[&#39;ru&#39;, &#39;en&#39;] | str
