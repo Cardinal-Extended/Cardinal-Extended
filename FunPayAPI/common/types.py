@@ -18,7 +18,7 @@ from typing import Literal
 import json
 
 
-def __get_message_type_by_re(text: str) -> MessageTypes:
+def get_message_type_by_re(text: str) -> MessageTypes:
     '''
     Возвращает тип сообщения на основе регулярных выражений.
 
@@ -322,7 +322,7 @@ class ChatShortcut:
         '''
         Тип последнего сообщения в чате на основе регулярных выражений.
         '''
-        if self.__last_message_type is None: self.__last_message_type = __get_message_type_by_re(self.last_message_text)
+        if self.__last_message_type is None: self.__last_message_type = get_message_type_by_re(self.last_message_text)
 
 
         return self.__last_message_type
@@ -466,9 +466,9 @@ class Message:
         Тип сообщения.
         '''
         if self.__type is None:
-            if self.author_id == 0: self.__type = MessageTypes.NON_SYSTEM
+            if self.author_id not in [0, 500]: self.__type = MessageTypes.NON_SYSTEM
 
-            else: self.__type = __get_message_type_by_re(self.text)
+            else: self.__type = get_message_type_by_re(self.text)
 
 
         return self.__type
