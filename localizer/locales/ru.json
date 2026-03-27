@@ -33,6 +33,7 @@
 
 
     "c_ext_getting_plugin_raw_info": "Получаю информацию о плагине {}.",
+    "c_ext_getting_plugin_hash": "Получаю хеш файлов плагина {}.",
 
 
     "c_ext_loading_plugins": "Загружаю плагины.",

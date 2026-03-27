@@ -33,6 +33,7 @@
 
 
     "c_ext_getting_plugin_raw_info": "Receiving plugin {} raw data.",
+    "c_ext_getting_plugin_hash": "Receiving plugin {} files hash.",
 
 
     "c_ext_loading_plugins": "Loading plugins.",

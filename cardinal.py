@@ -19,6 +19,7 @@ from FunPayAPI import Account, Runner, EventTypes, SubCategoryTypes, Currencies,
 
 
 import json
+import hashlib
 from types import ModuleType
 from typing import Literal, Any, NoReturn
 from pathlib import Path
@@ -819,14 +820,40 @@ class Cardinal:
             with open(plugin_dependencies_path, encoding='utf-8') as fp: plugin_dependencies = json.load(fp)
         else: plugin_dependencies = {}
 
+        plugin_hash = Cardinal.get_plugin_hash(plugin_dir)
+
         return plugin_info['UUID'], {
             'NAME': plugin_info['NAME'],
             'VERSION': plugin_info['VERSION'],
             'DESCRIPTION': plugin_info['DESCRIPTION'],
             'CREDITS': plugin_info['CREDITS'],
             'dependencies': plugin_dependencies,
-            'plugin_dir': plugin_dir
+            'plugin_dir': plugin_dir,
+            'plugin_hash': plugin_hash
         }
+
+
+    @staticmethod
+    def get_plugin_hash(plugin_dir: Path) -> dict[str]:
+        '''
+        Возвращает sha256 хеш всех файлов плагина.
+
+        :param plugin_dir: Путь к плагину.
+        :type plugin_dir: Path
+        :return: Хеш файлов плагина.
+        :rtype: dict[str, HASH]
+        '''
+        log.debug(f'c_ext_getting_plugin_hash', plugin_dir)
+
+        result: dict[str] = {}
+
+        for file_path in plugin_dir.iterdir():
+            if '__pycache__' in str(file_path): continue
+
+            result[str(file_path).replace(f'{plugin_dir}\\', '')] = hashlib.sha256(file_path.read_bytes())
+
+
+        return result
 
 
     def load_plugins(self) -> None:
