@@ -1830,21 +1830,40 @@ class OrderStatusChangedEvent(BaseEvent):
 
 
 # ------------------------------ Runner Payload ------------------------------ #
-@dataclass
+@dataclass(unsafe_hash=True)
 class RunnerPayload:
+    '''
+    Класс, описывающий полезную нагрузку, отправляемую в запросе runner/.
+
+    :param objects: Список объектов, отправляемых в / получаемых из запроса, defaults to [].
+    :type objects: list[RunnerPayloadObject], optional
+    :param request: Объект, описывающий запрос, defaults to False.
+    :type request: RunnerPayloadRequest | False, optional
+    '''
     objects: list[RunnerPayloadObject] = field(default_factory=list)
-    request: RunnerPayloadRequest | False = False
+    request: RunnerPayloadRequest | Literal[False] = field(default=False)
 
 
     def to_json(self) -> dict[Literal['objects', 'request'], str]:
         return {
-            'objects': json.dumps([obj.to_dict() for obj in self.objects])
+            'objects': json.dumps([obj.to_dict() for obj in self.objects]),
+            'request': self.request if self.request is False else json.dumps(self.request.to_dict())
         }
 
 
 @dataclass
 class RunnerPayloadObject:
-    type: str
+    '''
+    Класс, описывающий объект полезной нагрузки запроса runner/.
+
+    :param type: Тип объекта.
+    :type type: str
+    :param tag: Тег запроса раннера.
+    :type tag: str
+    :param data: Информация об объекте.
+    :type data: dict
+    '''
+    type: Literal['orders_counters', 'chat_bookmarks'] | str = field(default_factory=str)
     tag: str
     data: dict = field(default_factory=dict)
 
@@ -1857,9 +1876,31 @@ class RunnerPayloadObject:
         }
 
 
+    def __hash__(self): return hash((self.type, self.tag, tuple(self.data.values())))
+
+
 @dataclass
 class RunnerPayloadRequest:
-    ...
+    '''
+    Класс, описывающий запрос полезной нагрузки запроса runner/.
+
+    :param action: Тип действия (запроса).
+    :type action: str
+    :param data: Информация о запросе.
+    :type data: dict
+    '''
+    action: Literal['chat_message'] | str = field(default_factory=str)
+    data: dict = field(default_factory=dict)
+
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            'type': self.type,
+            'data': self.data
+        }
+
+
+    def __hash__(self): return hash((self.action, tuple(self.data.values())))
 
 
 __all__ = [

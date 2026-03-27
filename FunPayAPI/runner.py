@@ -1,8 +1,14 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Generator
 
-if TYPE_CHECKING: from .account import Account
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .account import Account
+
+    from requests import Response
+    from typing import Generator
+
 
 import json
 import logging
@@ -12,7 +18,7 @@ from time import time, sleep
 
 from . import (
     exceptions, OrderStatuses, generate_random_tag, BuyerViewing, ChatShortcut, OrderShortcut, InitialChatEvent, ChatsListChangedEvent, LastChatMessageChangedEvent,
-    NewMessageEvent, InitialOrderEvent, OrdersListChangedEvent, NewOrderEvent, OrderStatusChangedEvent
+    NewMessageEvent, InitialOrderEvent, OrdersListChangedEvent, NewOrderEvent, OrderStatusChangedEvent, RunnerPayload, RunnerPayloadObject, RunnerPayloadRequest
 )
 
 
@@ -89,8 +95,25 @@ class Runner:
         '{айди покупателя: что смотрит}.'
 
 
-    # def send_request(self, payload: dict): # TODO
-    #     payload['csrf_token'] = self.account.csrf_token
+    def send_request(self, payload: RunnerPayload) -> Response:
+        '''
+        Отправляет запрос runner/ с указанной полезной нагрузкой.
+
+        :param payload: Полезная нагрузка.
+        :type payload: RunnerPayload
+        :return: Объект ответа.
+        :rtype: Response
+        '''
+        headers = {
+            "accept": "*/*",
+            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "x-requested-with": "XMLHttpRequest"
+        }
+
+        payload_obj = payload.to_json()
+        payload_obj['csrf_token'] = self.account.csrf_token
+
+        return self.account.method('post', 'runner/', headers, payload_obj, raise_not_200=True)
 
 
     def get_updates(self) -> dict:
