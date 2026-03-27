@@ -1829,7 +1829,7 @@ class OrderStatusChangedEvent(BaseEvent):
     'Объект измененного заказа.'
 
 
-# ------------------------------ Runner Payload ------------------------------ #
+# ----------------------------- Объекты Runner'а ----------------------------- #
 @dataclass(unsafe_hash=True)
 class RunnerPayload:
     '''
@@ -1841,7 +1841,9 @@ class RunnerPayload:
     :type request: RunnerPayloadRequest | False, optional
     '''
     objects: list[RunnerPayloadObject] = field(default_factory=list)
+    'Список объектов, отправляемых в / получаемых из запроса.'
     request: RunnerPayloadRequest | Literal[False] = field(default=False)
+    'Объект, описывающий запрос.'
 
 
     def to_json(self) -> dict[Literal['objects', 'request'], str]:
@@ -1858,25 +1860,33 @@ class RunnerPayloadObject:
 
     :param type: Тип объекта.
     :type type: str
-    :param tag: Тег запроса раннера.
-    :type tag: str
-    :param data: Информация об объекте.
-    :type data: dict
+    :param id: Айди аккаунта пользователя / пользователей.
+    :type id: int | str
+    :param tag: Тег запроса раннера, defaults to '00000000'.
+    :type tag: str, optional
+    :param data: Информация об объекте, defaults to False.
+    :type data: dict | False, optional
     '''
-    type: Literal['orders_counters', 'chat_bookmarks'] | str = field(default_factory=str)
-    tag: str
-    data: dict = field(default_factory=dict)
+    type: Literal['orders_counters', 'chat_bookmarks', 'c-p-u'] | str
+    'Тип объекта.'
+    id: int | str
+    'Айди пользователя / пользователей.'
+    tag: str = field(default='00000000')
+    'Тег запроса раннера.'
+    data: dict | Literal[False] = field(default=False)
+    'Информация об объекте.'
 
 
     def to_dict(self) -> dict[str, str]:
         return {
             'type': self.type,
+            'id': self.id,
             'tag': self.tag,
             'data': self.data
         }
 
 
-    def __hash__(self): return hash((self.type, self.tag, tuple(self.data.values())))
+    def __hash__(self): return hash((self.type, self.id, self.tag, tuple(self.data.values())))
 
 
 @dataclass
@@ -1886,11 +1896,13 @@ class RunnerPayloadRequest:
 
     :param action: Тип действия (запроса).
     :type action: str
-    :param data: Информация о запросе.
-    :type data: dict
+    :param data: Информация о запросе, defaults to False.
+    :type data: dict | False, optional
     '''
-    action: Literal['chat_message'] | str = field(default_factory=str)
-    data: dict = field(default_factory=dict)
+    action: Literal['chat_message'] | str
+    'Тип действия (запроса).'
+    data: dict | Literal[False] = field(default=False)
+    'Информация о запросе.'
 
 
     def to_dict(self) -> dict[str, str]:

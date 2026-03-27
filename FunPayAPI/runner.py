@@ -120,35 +120,31 @@ class Runner:
         """
         Запрашивает список событий FunPay.
 
-        :return: ответ FunPay.
+        :return: Ответ запроса.
         :rtype: :obj:`dict`
         """
-        orders = {
-            "type": "orders_counters",
-            "id": self.account.id,
-            "tag": self.__last_order_event_tag,
-            "data": False
-        }
-        chats = {
-            "type": "chat_bookmarks",
-            "id": self.account.id,
-            "tag": self.__last_msg_event_tag,
-            "data": False
-        }
-        payload = {
-            "objects": json.dumps([orders, chats]),
-            "request": False,
-            "csrf_token": self.account.csrf_token
-        }
-        headers = {
-            "accept": "*/*",
-            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "x-requested-with": "XMLHttpRequest"
-        }
+        orders = RunnerPayloadObject(
+            'orders_counters',
+            self.account.id,
+            self.__last_order_event_tag
+        )
 
-        response = self.account.method("post", "runner/", headers, payload, raise_not_200=True)
+        chats = RunnerPayloadObject(
+            'chat_bookmarks',
+            self.account.id,
+            self.__last_msg_event_tag
+        )
+
+        payload = RunnerPayload(
+            [orders, chats]
+        )
+
+        response = self.send_request(payload)
+
         json_response = response.json()
+
         logger.debug(f"Получены данные о событиях: {json_response}")
+
         return json_response
 
 
