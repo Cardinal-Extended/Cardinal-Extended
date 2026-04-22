@@ -1123,6 +1123,9 @@ class Cardinal:
         :param handlers: Список хендлеров.
         :type handlers: list[Handler]
         '''
+        if not handlers: return
+
+
         handlers.sort(key=lambda h: h.priority if h.priority >= 0 else inf)
 
 
@@ -1230,9 +1233,11 @@ class Cardinal:
         return balance
 
 
-    def send_message(self, chat_id: int | str, message_text: str, chat_name: str | None = None,
-                     interlocutor_id: int | None = None, attempts: int = 3,
-                     watermark: bool = True) -> list[Message] | None:
+    def send_message(
+            self, chat_id: int | str, message_text: str, chat_name: str | None = None,
+            interlocutor_id: int | None = None, attempts: int = 3,
+            watermark: bool = True
+    ) -> list[Message] | None:
         '''
         Отправляет сообщение в чат FunPay.
 
