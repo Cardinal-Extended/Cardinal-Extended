@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 from . import (
     exceptions, MessageTypes, OrderStatuses, SubCategoryTypes, Currencies, Wallets, Months, generate_random_tag, PRODUCTS_AMOUNT_RE, EXCHANGE_RATE_RE, BuyerViewing,
     ChatShortcut, Chat, Message, OrderShortcut, Order, Category, SubCategory, LotFields, ChipFields, LotPage, SellerShortcut, LotShortcut, MyLotShortcut, UserProfile,
-    Review, Balance, PaymentMethod, CalcResult
+    Review, Balance, PaymentMethod, CalcResult, RunnerRequest, RunnerObject, RunnerPayload, RunnerResponse, FloodErrorTexts, MultiuserFloodErrorTexts
 )
 
 
@@ -56,10 +56,13 @@ class Account:
     :param locale: текущий язык аккаунта, опционально.
     :type locale: str | None
     """
-
-    def __init__(self, golden_key: str, user_agent: str | None = None,
-                 requests_timeout: int | float = 10, proxy: Optional[dict] = None,
-                 locale: Literal["ru", "en", "uk"] | None = None):
+    def __init__(
+            self, golden_key: str,
+            user_agent: str | None = None,
+            requests_timeout: int | float = 10,
+            proxy: Optional[dict] = None,
+            locale: Literal["ru", "en", "uk"] | None = None
+    ):
         self.golden_key: str = golden_key
         """Токен (golden_key) аккаунта."""
         self.user_agent: str | None = user_agent
@@ -611,50 +614,67 @@ class Account:
         return self.__parse_messages(json_response["chat"]["messages"], chat_id, interlocutor_id,
                                      interlocutor_username, from_id)
 
+
     def get_chats_histories(self, chats_data: dict[int | str, str | None]) -> dict[int, list[Message]]:
-        """
-        Получает историю сообщений сразу нескольких чатов
-        (до 50 сообщений на личный чат, до 25 сообщений на публичный чат).
+        '''
+        Получает историю сообщений сразу нескольких чатов (до 50 сообщений на личный чат, до 25 сообщений на публичный чат).
 
-        :param chats_data: ID чатов и никнеймы собеседников (None, если никнейм неизвестен)\n
-            Например: {48392847: "SLLMK", 58392098: "Amongus", 38948728: None}
-        :type chats_data: :obj:`dict` {:obj:`int` or :obj:`str`: :obj:`str` or :obj:`None`}
-
-        :return: словарь с историями чатов в формате {ID чата: [список сообщений]}
+        :param chats_data: Айди чатов и никнеймы собеседников (None, если никнейм неизвестен)\n
+            Например: {48392847: 'SLLMK', 58392098: 'Amongus', 38948728: None}
+        :type chats_data: dict[int  |  str, str  |  None]
+        :raises AccountNotInitiatedError: Поднимается, если аккаунт не был инициализирован.
+        :return: Словарь с историями чатов в формате {ID чата: [список сообщений]}
         :rtype: dict[int, list[Message]]
-        """
-        headers = {
-            "accept": "*/*",
-            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "x-requested-with": "XMLHttpRequest"
-        }
-        chats = [{"type": "chat_node", "id": i, "tag": "00000000",
-                  "data": {"node": i, "last_message": -1, "content": ""}} for i in chats_data]
-        payload = {
-            "objects": json.dumps(chats),
-            "request": False,
-            "csrf_token": self.csrf_token
-        }
-        response = self.method("post", "runner/", headers, payload, raise_not_200=True)
-        json_response = response.json()
+        '''
+        if not self.is_initiated: raise exceptions.AccountNotInitiatedError()
+
+
+        chats = [
+            RunnerObject(
+                'chat_node',
+                chat_id,
+                data={'node': chat_id, 'last_message': -1, 'content': ''}
+            ) for chat_id in chats_data.keys
+        ]
+
+        payload = RunnerPayload(
+            chats
+        )
+
+        response = self.runner.send_request(payload)
+
+        response_obj = RunnerResponse.from_json(response.json())
+
+        logger.debug(f'Получен ответ: {response_obj}')
+
 
         result = {}
-        for i in json_response["objects"]:
-            if i.get("type") == "chat_node":
-                if not i.get("data"):
-                    result[i.get("id")] = []
+        for obj in response_obj.objects:
+            if obj.type == 'chat_node':
+                if not obj.data:
+                    result[obj.id] = []
                     continue
-                if i["data"]["node"]["silent"]:
+
+
+                if obj.data['node']['silent']:
                     interlocutor_id = None
                     interlocutor_name = None
+
                 else:
-                    interlocutors = i["data"]["node"]["name"].split("-")[1:]
+                    interlocutors = obj.data['node']['name'].split('-')[1:]
                     interlocutors.remove(str(self.id))
+
                     interlocutor_id = int(interlocutors[0])
-                    interlocutor_name = chats_data[i.get("id")]
-                messages = self.__parse_messages(i["data"]["messages"], i.get("id"), interlocutor_id, interlocutor_name)
-                result[i.get("id")] = messages
+                    interlocutor_name = chats_data[obj.id]
+
+
+                messages = self.__parse_messages(obj.data['messages'], obj.id, interlocutor_id, interlocutor_name)
+
+                result[obj.id] = messages
+
+
         return result
+
 
     def upload_image(self, image: str | IO[bytes], type_: Literal["chat", "offer"] = "chat") -> int:
         """
@@ -711,153 +731,148 @@ class Account:
             raise exceptions.ImageUploadError(response, None)
         return int(document_id)
 
-    def send_message(self, chat_id: int | str, text: Optional[str] = None, chat_name: Optional[str] = None,
-                     interlocutor_id: Optional[int] = None,
-                     image_id: Optional[int] = None, add_to_ignore_list: bool = True,
-                     update_last_saved_message: bool = False, leave_as_unread: bool = False) -> Message:
-        """
+
+    def send_message(
+            self, chat_id: int | str, text: str | None = None, chat_name: str | None = None,
+            interlocutor_id: int | None = None,
+            image_id: int | None = None,
+            add_to_ignore_list: bool = True, update_last_saved_message: bool = False, leave_as_unread: bool = False
+    ) -> Message:
+        '''
         Отправляет сообщение в чат.
 
-        :param chat_id: ID чата.
-        :type chat_id: :obj:`int` or :obj:`str`
-
-        :param text: текст сообщения.
-        :type text: :obj:`str` or :obj:`None`, опционально
-
-        :param chat_name: название чата (для возвращаемого объекта сообщения) (не нужно для отправки сообщения в публичный чат).
-        :type chat_name: :obj:`str` or :obj:`None`, опционально
-
-        :param interlocutor_id: ID собеседника (не нужно для отправки сообщения в публичный чат).
-        :type interlocutor_id: :obj:`int` or :obj:`None`, опционально
-
-        :param image_id: ID изображения. Доступно только для личных чатов.
-        :type image_id: :obj:`int` or :obj:`None`, опционально
-
-        :param add_to_ignore_list: добавлять ли ID отправленного сообщения в игнорируемый список Runner'а?
-        :type add_to_ignore_list: :obj:`bool`, опционально
-
-        :param update_last_saved_message: обновлять ли последнее сохраненное сообщение на отправленное в Runner'е?
-        :type update_last_saved_message: :obj:`bool`, опционально.
-
-        :param leave_as_unread: оставлять ли сообщение непрочитанным при отправке?
-        :type leave_as_unread: :obj:`bool`, опционально
-
-        :return: экземпляр отправленного сообщения.
+        :param chat_id: Айди чата.
+        :type chat_id: int | str
+        :param text: Текст сообщения, defaults to None.
+        :type text: str | None, optional
+        :param chat_name: Название чата (для возвращаемого объекта сообщения) (не нужно для отправки сообщения в публичный чат), defaults to None.
+        :type chat_name: str | None, optional
+        :param interlocutor_id: Айди собеседника (не нужно для отправки сообщения в публичный чат), defaults to None.
+        :type interlocutor_id: int | None, optional
+        :param image_id: Айди изображения. Доступно только для личных чатов, defaults to None.
+        :type image_id: int | None, optional
+        :param add_to_ignore_list: Добавлять ли айди отправленного сообщения в игнорируемый список Runner'а, defaults to True.
+        :type add_to_ignore_list: bool, optional
+        :param update_last_saved_message: Обновлять ли последнее сохраненное сообщение на отправленное в Runner'е, defaults to False.
+        :type update_last_saved_message: bool, optional
+        :param leave_as_unread: Оставлять ли сообщение непрочитанным при отправке, defaults to False.
+        :type leave_as_unread: bool, optional
+        :raises AccountNotInitiatedError: Поднимается, если аккаунт не был инициализирован.
+        :raises MessageNotDeliveredError: Поднимается, если не удалось отправить сообщение.
+        :return: Отправленное сообщение.
         :rtype: Message
-        """
-        if not self.is_initiated:
-            raise exceptions.AccountNotInitiatedError()
+        '''
+        if not self.is_initiated: raise exceptions.AccountNotInitiatedError()
 
-        headers = {
-            "accept": "*/*",
-            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "x-requested-with": "XMLHttpRequest"
-        }
-        request = {
-            "action": "chat_message",
-            "data": {"node": chat_id, "last_message": -1, "content": text}
-        }
+
+        request = RunnerRequest(
+            'chat_message',
+            {'node': chat_id, 'last_message': -1}
+        )
 
         if image_id is not None:
-            request["data"]["image_id"] = image_id
-            request["data"]["content"] = ""
-        else:
-            request["data"]["content"] = f"{self.__bot_character}{text}" if text else ""
+            request.data['image_id'] = image_id
+            request.data['content'] = ''
 
-        objects = [
-            {
-                "type": "chat_node",
-                "id": chat_id,
-                "tag": "00000000",
-                "data": {"node": chat_id, "last_message": -1, "content": ""}
-            }
-        ]
-        payload = {
-            "objects": "" if leave_as_unread else json.dumps(objects),
-            "request": json.dumps(request),
-            "csrf_token": self.csrf_token
-        }
+        else: request.data['content'] = f'{self.__bot_character}{text}' if text else ''
 
-        response = self.method("post", "runner/", headers, payload, raise_not_200=True)
-        json_response = response.json()
-        if not (resp := json_response.get("response")):
-            raise exceptions.MessageNotDeliveredError(response, None, chat_id)
 
-        if (error_text := resp.get("error")) is not None:
-            if error_text in ("Нельзя отправлять сообщения слишком часто.",
-                              "You cannot send messages too frequently.",
-                              "Не можна надсилати повідомлення занадто часто."):
-                self.last_flood_err_time = time()
-            elif error_text in ("Нельзя слишком часто отправлять сообщения разным пользователям.",
-                                "Не можна надто часто надсилати повідомлення різним користувачам.",
-                                "You cannot message multiple users too frequently."):
-                self.last_multiuser_flood_err_time = time()
-            raise exceptions.MessageNotDeliveredError(response, error_text, chat_id)
+        chats_data = RunnerObject(
+            'chat_node',
+            chat_id,
+            data={'node': chat_id, 'last_message': -1, 'content': ''}
+        )
+
+        payload = RunnerPayload(
+            [chats_data],
+            request
+        )
+
+        response = self.runner.send_request(payload)
+
+        response_obj = RunnerResponse.from_json(response.json())
+
+        logger.debug(f'Получен ответ: {response_obj}')
+
+
+        if not response_obj.response: raise exceptions.MessageNotDeliveredError(response, None, chat_id)
+
+
+        if (error := response_obj.response.get('error')) is not None:
+            if error in [error_text.value for error_text in FloodErrorTexts]: self.last_flood_err_time = time()
+            elif error in [error_text.value for error_text in MultiuserFloodErrorTexts]: self.last_multiuser_flood_err_time = time()
+
+            raise exceptions.MessageNotDeliveredError(response, error, chat_id)
+
+
         if leave_as_unread:
-            message_text = text
-            fake_html = f"""
+            msg_id = 0
+
+            msg_text = text
+
+            msg_html = f"""
             <div class="chat-msg-item" id="message-0000000000">
                 <div class="chat-message">
                     <div class="chat-msg-body">
-                        <div class="chat-msg-text">{message_text}</div>
+                        <div class="chat-msg-text">{msg_text}</div>
                     </div>
                 </div>
             </div>
             """
 
-
-            message_obj = Message(
-                0,
-                message_text,
-                chat_id,
-                chat_name,
-                interlocutor_id,
-                self.username,
-                self.id,
-                fake_html,
-                by_bot=True
-            )
+            image_name = None
+            image_link = None
 
 
         else:
-            mes = json_response["objects"][0]["data"]["messages"][-1]
-            parser = BeautifulSoup(mes["html"].replace("<br>", "\n"), "lxml")
-            image_name = None
-            image_link = None
-            message_text = None
+            msg = response_obj.objects[0].data['messages'][-1]
+            parser = BeautifulSoup(msg["html"].replace("<br>", "\n"), "lxml")
+
+            msg_id = msg['id']
+
             try:
-                if image_tag := parser.find("a", {"class": "chat-img-link"}):
-                    image_name = image_tag.find("img")
+                if image_tag:=parser.find('a', {'class': 'chat-img-link'}):
+                    msg_text = None
+                    image_name = image_tag.find('img')
                     image_name = image_name.get('alt') if image_name else None
-                    image_link = image_tag.get("href")
+                    image_link = image_tag.get('href')
+
                 else:
-                    message_text = parser.find("div", {"class": "chat-msg-text"}).text.replace(self.__bot_character, "", 1)
+                    msg_text = parser.find("div", {"class": "chat-msg-text"}).text.replace(self.__bot_character, "", 1)
+                    image_name = None
+                    image_link = None
+
             except Exception as e:
                 logger.debug("SEND_MESSAGE RESPONSE")
                 logger.debug(response.content.decode())
                 raise e
 
+            msg_html = msg['html']
 
-            message_obj = Message(
-                int(mes["id"]),
-                message_text,
-                chat_id,
-                chat_name,
-                interlocutor_id,
-                self.username,
-                self.id,
-                mes["html"],
-                by_bot=True,
-                image_link=image_link,
-                image_name=image_name
-            )
+
+        message_obj = Message(
+            msg_id,
+            msg_text,
+            chat_id,
+            chat_name,
+            interlocutor_id,
+            self.username,
+            self.id,
+            msg_html,
+            by_bot=True,
+            image_link=image_link,
+            image_name=image_name
+        )
+
 
         if self.runner and isinstance(chat_id, int):
-            if add_to_ignore_list and message_obj.id:
-                self.runner.mark_as_by_bot(chat_id, message_obj.id)
-            if update_last_saved_message:
-                self.runner.update_chat_last_message(chat_id, message_obj.id, message_obj.text)
+            if add_to_ignore_list and message_obj.id: self.runner.mark_as_by_bot(chat_id, message_obj.id)
+
+            if update_last_saved_message: self.runner.update_chat_last_message(chat_id, message_obj.id, message_obj.text)
+
+
         return message_obj
+
 
     def send_image(self, chat_id: int, image: int | str | IO[bytes], chat_name: Optional[str] = None,
                    interlocutor_id: Optional[int] = None,
@@ -1681,61 +1696,64 @@ class Account:
             self.__saved_chats[i.id] = i
 
     def request_chats(self) -> list[ChatShortcut]:
-        """
+        '''
         Запрашивает чаты и парсит их.
 
-        :return: объекты чатов (не больше 50).
+        :raises AccountNotInitiatedError: Поднимается, если аккаунт не был инициализирован.
+        :return: Объекты чатов (не больше 50).
         :rtype: list[ChatShortcut]
-        """
-        chats = {
-            "type": "chat_bookmarks",
-            "id": self.id,
-            "tag": generate_random_tag(),
-            "data": False
-        }
-        payload = {
-            "objects": json.dumps([chats]),
-            "request": False,
-            "csrf_token": self.csrf_token
-        }
-        headers = {
-            "accept": "*/*",
-            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "x-requested-with": "XMLHttpRequest"
-        }
-        response = self.method("post", "https://funpay.com/runner/", headers, payload, raise_not_200=True)
-        json_response = response.json()
+        '''
+        if not self.is_initiated: raise exceptions.AccountNotInitiatedError()
 
-        msgs = ""
-        for obj in json_response["objects"]:
-            if obj.get("type") != "chat_bookmarks":
-                continue
-            msgs = obj["data"]["html"]
-        if not msgs:
-            return []
 
-        parser = BeautifulSoup(msgs, "lxml")
-        chats = parser.find_all("a", {"class": "contact-item"})
-        chats_objs = []
+        chats_data = RunnerObject(
+            'chat_bookmarks',
+            self.id,
+            generate_random_tag()
+        )
 
-        for msg in chats:
-            chat_id = int(msg["data-id"])
-            last_msg_text = msg.find("div", {"class": "contact-item-message"}).text
-            unread = True if "unread" in msg.get("class") else False
-            chat_with = msg.find("div", {"class": "media-user-name"}).text
-            node_msg_id = int(msg.get('data-node-msg'))
-            user_msg_id = int(msg.get('data-user-msg'))
-            by_bot = False
-            by_vertex = False
-            is_image = last_msg_text in ("Изображение", "Зображення", "Image")
-            if last_msg_text.startswith(self.bot_character):
-                last_msg_text = last_msg_text[1:]
-                by_bot = True
-            chat_obj = ChatShortcut(chat_id, chat_with, last_msg_text, node_msg_id, user_msg_id, unread, str(msg), by_bot if not is_image else None)
-            chat_obj = ChatShortcut(chat_id, chat_with, last_msg_text, node_msg_id, user_msg_id, unread, str(msg))
+        payload = RunnerPayload(
+            [chats_data]
+        )
 
-            chats_objs.append(chat_obj)
+        response = self.runner.send_request(payload)
+
+        response_obj = RunnerResponse.from_json(response.json())
+
+
+        for obj in response_obj.objects:
+            if obj.type == 'chat_bookmarks':
+                msgs = obj.data['html']
+
+                break
+
+        else: return []
+
+
+        parser = BeautifulSoup(msgs, 'lxml')
+    
+        chats = parser.find_all('a', {'class': 'contact-item'})
+
+
+        chats_objs = [
+            ChatShortcut(
+                int(msg['data-id']),
+                msg.find('div', {'class': 'media-user-name'}).text,
+                (
+                    last_msg_text if not (last_msg_text:=msg.find('div', {'class': 'contact-item-message'}).text).startswith(self.bot_character) else
+                    last_msg_text[1:]
+                ),
+                int(msg.get('data-node-msg')),
+                int(msg.get('data-user-msg')),
+                True if 'unread' in msg.get('class') else False,
+                str(msg),
+                True if last_msg_text.startswith(self.bot_character) else False
+            ) for msg in chats
+        ]
+
+
         return chats_objs
+
 
     def get_chats(self, update: bool = False) -> dict[int, ChatShortcut]:
         """

@@ -18,7 +18,7 @@ from time import time, sleep
 
 from . import (
     exceptions, OrderStatuses, generate_random_tag, BuyerViewing, ChatShortcut, OrderShortcut, InitialChatEvent, ChatsListChangedEvent, LastChatMessageChangedEvent,
-    NewMessageEvent, InitialOrderEvent, OrdersListChangedEvent, NewOrderEvent, OrderStatusChangedEvent, RunnerPayload, RunnerPayloadObject, RunnerPayloadRequest
+    NewMessageEvent, InitialOrderEvent, OrdersListChangedEvent, NewOrderEvent, OrderStatusChangedEvent, RunnerPayload, RunnerObject, RunnerRequest, RunnerResponse
 )
 
 
@@ -104,6 +104,8 @@ class Runner:
         :return: Объект ответа.
         :rtype: Response
         '''
+        logger.debug(f'Отправляю запрос: {payload}')
+
         headers = {
             "accept": "*/*",
             "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
@@ -123,13 +125,13 @@ class Runner:
         :return: Ответ запроса.
         :rtype: :obj:`dict`
         """
-        orders = RunnerPayloadObject(
+        orders = RunnerObject(
             'orders_counters',
             self.account.id,
             self.__last_order_event_tag
         )
 
-        chats = RunnerPayloadObject(
+        chats = RunnerObject(
             'chat_bookmarks',
             self.account.id,
             self.__last_msg_event_tag
@@ -143,7 +145,9 @@ class Runner:
 
         json_response = response.json()
 
-        logger.debug(f"Получены данные о событиях: {json_response}")
+        response_obj = RunnerResponse.from_json(json_response)
+
+        logger.debug(f"Получены данные о событиях: {response_obj}")
 
         return json_response
 

@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from . import (
     DISCORD_RE, DEAR_VENDORS_RE, ORDER_PURCHASED_RE, ORDER_CONFIRMED_RE, NEW_FEEDBACK_RE, NEW_FEEDBACK_ANSWER_RE, FEEDBACK_CHANGED_RE, FEEDBACK_DELETED_RE, REFUND_RE,
-    FEEDBACK_ANSWER_CHANGED_RE, FEEDBACK_ANSWER_DELETED_RE, ORDER_CONFIRMED_BY_ADMIN_RE, PARTIAL_REFUND_RE, ORDER_REOPENED_RE, REFUND_BY_ADMIN_RE, PRODUCTS_AMOUNT_RE,
-    generate_random_tag
+    FEEDBACK_ANSWER_CHANGED_RE, FEEDBACK_ANSWER_DELETED_RE, ORDER_CONFIRMED_BY_ADMIN_RE, PARTIAL_REFUND_RE, ORDER_REOPENED_RE, REFUND_BY_ADMIN_RE, PRODUCTS_AMOUNT_RE
 )
 
 
@@ -14,7 +13,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from datetime import datetime
 from time import time
-from typing import Literal
+from typing import Literal, Self
 import json
 
 
@@ -241,6 +240,18 @@ class Months(Enum):
     December = 12
     декабря = 12
     грудня = 12
+
+
+class FloodErrorTexts(Enum):
+    ru = 'Нельзя отправлять сообщения слишком часто.'
+    en = 'You cannot send messages too frequently.'
+    uk = 'Не можна надсилати повідомлення занадто часто.'
+
+
+class MultiuserFloodErrorTexts(Enum):
+    ru = 'Нельзя слишком часто отправлять сообщения разным пользователям.'
+    en = 'Не можна надто часто надсилати повідомлення різним користувачам.'
+    uk = 'You cannot message multiple users too frequently.'
 
 
 # ---------------------------------------------------------------------------- #
@@ -1836,13 +1847,13 @@ class RunnerPayload:
     Класс, описывающий полезную нагрузку, отправляемую в запросе runner/.
 
     :param objects: Список объектов, отправляемых в / получаемых из запроса, defaults to [].
-    :type objects: list[RunnerPayloadObject], optional
+    :type objects: list[RunnerObject], optional
     :param request: Объект, описывающий запрос, defaults to False.
-    :type request: RunnerPayloadRequest | False, optional
+    :type request: RunnerRequest | False, optional
     '''
-    objects: list[RunnerPayloadObject] = field(default_factory=list)
+    objects: list[RunnerObject] = field(default_factory=list)
     'Список объектов, отправляемых в / получаемых из запроса.'
-    request: RunnerPayloadRequest | Literal[False] = field(default=False)
+    request: RunnerRequest | Literal[False] = False
     'Объект, описывающий запрос.'
 
 
@@ -1854,9 +1865,9 @@ class RunnerPayload:
 
 
 @dataclass
-class RunnerPayloadObject:
+class RunnerObject:
     '''
-    Класс, описывающий объект полезной нагрузки запроса runner/.
+    Класс, описывающий объект запроса runner/.
 
     :param type: Тип объекта.
     :type type: str
@@ -1867,13 +1878,13 @@ class RunnerPayloadObject:
     :param data: Информация об объекте, defaults to False.
     :type data: dict | False, optional
     '''
-    type: Literal['orders_counters', 'chat_bookmarks', 'c-p-u'] | str
+    type: Literal['orders_counters', 'chat_bookmarks', 'c-p-u', 'chat_node'] | str
     'Тип объекта.'
     id: int | str
     'Айди пользователя / пользователей.'
-    tag: str = field(default='00000000')
+    tag: str = '00000000'
     'Тег запроса раннера.'
-    data: dict | Literal[False] = field(default=False)
+    data: dict | Literal[False] = False
     'Информация об объекте.'
 
 
@@ -1886,13 +1897,23 @@ class RunnerPayloadObject:
         }
 
 
+    @classmethod
+    def from_json(cls, obj: dict) -> Self:
+        return cls(
+            obj['type'],
+            obj['id'],
+            obj['tag'],
+            obj['data']
+        )
+
+
     def __hash__(self): return hash((self.type, self.id, self.tag, tuple(self.data.values())))
 
 
 @dataclass
-class RunnerPayloadRequest:
+class RunnerRequest:
     '''
-    Класс, описывающий запрос полезной нагрузки запроса runner/.
+    Класс, описывающий запрос runner/.
 
     :param action: Тип действия (запроса).
     :type action: str
@@ -1901,18 +1922,33 @@ class RunnerPayloadRequest:
     '''
     action: Literal['chat_message'] | str
     'Тип действия (запроса).'
-    data: dict | Literal[False] = field(default=False)
+    data: dict | Literal[False] = False
     'Информация о запросе.'
 
 
     def to_dict(self) -> dict[str, str]:
         return {
-            'type': self.type,
+            'action': self.action,
             'data': self.data
         }
 
 
     def __hash__(self): return hash((self.action, tuple(self.data.values())))
+
+
+@dataclass
+class RunnerResponse:
+    '''
+    Класс, описывающий ответ запроса runner/.
+    '''
+    objects: list[RunnerObject] = field(default_factory=list)
+    response: dict | Literal[False] = False
+
+    @classmethod
+    def from_json(cls, obj: dict) -> Self: return cls(
+        objects=[] if not obj.get('objects') else [RunnerObject.from_json(object) for object in obj['objects']],
+        response=obj.get('response', False)
+    )
 
 
 __all__ = [
@@ -1923,6 +1959,8 @@ __all__ = [
     'Currencies',
     'Wallets',
     'Months',
+    'FloodErrorTexts',
+    'MultiuserFloodErrorTexts',
     'BuyerViewing',
     'ChatShortcut',
     'Chat',
@@ -1952,6 +1990,7 @@ __all__ = [
     'NewOrderEvent',
     'OrderStatusChangedEvent',
     'RunnerPayload',
-    'RunnerPayloadObject',
-    'RunnerPayloadRequest'
+    'RunnerObject',
+    'RunnerRequest',
+    'RunnerResponse'
 ]
