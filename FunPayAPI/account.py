@@ -634,7 +634,7 @@ class Account:
                 'chat_node',
                 chat_id,
                 data={'node': chat_id, 'last_message': -1, 'content': ''}
-            ) for chat_id in chats_data.keys
+            ) for chat_id in chats_data
         ]
 
         payload = RunnerPayload(
