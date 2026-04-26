@@ -20,6 +20,7 @@ from FunPayAPI import Account, Runner, EventTypes, SubCategoryTypes, Currencies,
 
 import json
 import hashlib
+from _hashlib import HASH as Hash
 from types import ModuleType
 from typing import Literal, Any, NoReturn
 from pathlib import Path
@@ -834,23 +835,41 @@ class Cardinal:
 
 
     @staticmethod
-    def get_plugin_hash(plugin_dir: Path) -> dict[str]:
+    def get_plugin_hash(plugin_dir: Path) -> Hash:
         '''
-        Возвращает sha256 хеш всех файлов плагина.
+        Возвращает sha256 хеш плагина.
 
         :param plugin_dir: Путь к плагину.
         :type plugin_dir: Path
         :return: Хеш файлов плагина.
         :rtype: dict[str, HASH]
         '''
+        def hash_update_from_file(file_path: Path, hash: Hash):
+            hash.update(file_path.read_bytes())
+
+
+            return hash
+
+        def hash_update_from_dir(directory: Path, hash: Hash):
+            for path in sorted(directory.iterdir(), key=lambda p: str(p).lower()):
+                if '__pycache__' in str(directory): continue
+
+                hash.update(path.name.encode())
+
+
+                if path.is_file(): hash = hash_update_from_file(path, hash)
+
+                elif path.is_dir(): hash = hash_update_from_dir(path, hash)
+
+
+            return hash
+
+
         log.debug(f'c_ext_getting_plugin_hash', plugin_dir)
 
-        result: dict[str] = {}
+        result = hashlib.sha256()
 
-        for file_path in plugin_dir.iterdir():
-            if '__pycache__' in str(file_path): continue
-
-            result[str(file_path).replace(f'{plugin_dir}\\', '')] = hashlib.sha256(file_path.read_bytes())
+        result = hash_update_from_dir(plugin_dir, result)
 
 
         return result
