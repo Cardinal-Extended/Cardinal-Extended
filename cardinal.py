@@ -896,13 +896,19 @@ class Cardinal:
             except exceptions.PluginNotTrustedException:
                 log.warning(self.translate('c_ext_plugin_is_not_trusted_err', plugin_uuid))
 
+                del self.plugins[plugin_uuid]
+
             except exceptions.PluginDependenciesNotLoadedError:
                 log.error(self.translate('c_ext_plugin_dependencies_not_loaded_err', plugin_uuid))
                 log.debug('TRACEBACK', exc_info=True)
 
+                del self.plugins[plugin_uuid]
+
             except:
                 log.error(self.translate('c_ext_plugin_load_error', plugin_uuid))
                 log.debug('TRACEBACK', exc_info=True)
+
+                del self.plugins[plugin_uuid]
 
 
         log.debug(self.translate('c_ext_loading_plugins_success', plugins_count))
