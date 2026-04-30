@@ -196,7 +196,7 @@ class Localizer:
         current_localization = getattr(self, locale)
 
         if hasattr(current_localization, variable_name) and not force_add:
-            log.warning(f'Не удалось добавить перевод {variable_name}, т.к. он уже есть в локализации {locale}.')
+            log.debug(f'Не удалось добавить перевод {variable_name}, т.к. он уже есть в локализации {locale}.')
 
             return
 

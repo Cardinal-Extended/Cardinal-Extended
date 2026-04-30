@@ -1037,9 +1037,9 @@ class Cardinal:
         if hasattr(plugin.module, 'LOAD_PLUGIN'):
             log.debug(self.translate('c_ext_running_load_plugin_handlers', plugin.name, plugin.uuid))
 
-            init_plugin_handlers = [Handler(plugin.uuid, 'LOAD_PLUGIN', 0, func) for func in getattr(plugin.module, 'LOAD_PLUGIN')]
+            load_plugin_handlers = [Handler(plugin.uuid, 'LOAD_PLUGIN', 0, func) for func in getattr(plugin.module, 'LOAD_PLUGIN')]
 
-            self.run_handlers(init_plugin_handlers)
+            self.run_handlers(load_plugin_handlers)
 
 
         log.debug(self.translate('c_ext_plugin_load_success', plugin.name, plugin.uuid))
