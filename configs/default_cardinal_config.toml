@@ -2,7 +2,7 @@
     language = "en" # Cardinal's language (logs, etc.)
 
 
-    github_api_page_url = "https://api.github.com/repos/Shiro-Okamoto/CardinalExtended" # Where to check for updates
+    github_api_page_url = "https://api.github.com/repos/Cardinal-Extended/Cardinal-Extended" # Where to check for updates
     check_for_updates = true # Automatically check for new releases
     check_for_updates_delay = 600 # Delay between checks (in seconds)
     auto_update = false # Automatically update, if any new release is found (will also fully restart program)
